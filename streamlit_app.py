@@ -163,7 +163,9 @@ def _run_simulation_detailed(
         if ATIVAR_SUAVIZACAO_FV and hora_do_dia >= 6 and hora_do_dia < 18:
             diferenca_fv = geracao_fv_bruta - geracao_fv_meta
             # Verifica se há discrepância na suavização
-            if diferenca_fv > 30:
+            if diferenca_fv > 15:
+                print(diferenca_fv)
+                print("/n")
                 potencia_carregamento_alvo = min(diferenca_fv, bess_potencia_disponivel_carga) #Vê potência que será injetada
                 potencia_carregamento = potencia_carregamento_alvo * fator_rampa_carga
                 espaco_disponivel_kwh = max(0, (bess_capacidade_kwh * SOC_LIMITE_MAX / 100) - bess_soc_kwh)
@@ -173,7 +175,7 @@ def _run_simulation_detailed(
                     bess_soc_kwh += energia_final_adicionada
                     potencia_bess_suavizacao = (energia_final_adicionada / EFICIENCIA_CARREGAMENTO) / passo_de_tempo_h
                     bess_potencia_disponivel_carga -= potencia_bess_suavizacao
-            elif diferenca_fv < 30:
+            elif diferenca_fv < 15:
                 potencia_descarga = min(-diferenca_fv, bess_potencia_disponivel_descarga)
                 soc_min_kwh_atual = bess_capacidade_kwh * (SOC_LIMITE_MIN_EMERGENCIA if potencia_carga_atual > carga_limite_emergencia else SOC_LIMITE_MIN_NORMAL) / 100
                 energia_disponivel_kwh = max(0, bess_soc_kwh - soc_min_kwh_atual)
