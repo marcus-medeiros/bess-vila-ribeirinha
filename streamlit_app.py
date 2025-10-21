@@ -209,8 +209,8 @@ def _run_simulation_detailed(
         bess_pode_ajudar = (soc_percentual_atual > SOC_LIMITE_MIN_NORMAL) or \
                            (potencia_carga_atual > carga_limite_emergencia and soc_percentual_atual > SOC_LIMITE_MIN_EMERGENCIA)
         
-        # Se não houver planta FV, o BESS não deve operar, pois o BESS não faz sentido carregar com o GMG
-        if potencia_pico_fv_base <= 0:
+        # Se não houver planta FV (potência de pico EFETIVA é zero), o BESS não deve operar
+        if potencia_pico_fv_curto <= 1e-6: # Usamos 1e-6 para evitar problemas com float
             bess_pode_ajudar = False
 
         # Ajuda do BESS ponderada!
@@ -560,7 +560,7 @@ def plot_graph_3(dias_simulacao, resultados_sim):
 
             eixos3.set_xlabel('Horas', fontsize=12)
             eixos3.set_ylabel('Potência Média (kW)', fontsize=12)
-            eixos3.set_title('Composição Média do Atendimento da Carga (2º Dia)', fontsize=16)
+            eixos3.set_title('Composição Média do Atendimento da Carga', fontsize=16)
             eixos3.set_xticks(horas_dia)
             eixos3.set_ylim(0, max(carga_horaria) * 1.2 if max(carga_horaria) > 0 else 100)
             eixos3.legend(loc='upper left')
