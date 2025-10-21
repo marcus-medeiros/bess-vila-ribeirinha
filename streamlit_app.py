@@ -28,6 +28,8 @@ SOC_LIMITE_MIN_NORMAL = 40
 SOC_LIMITE_MIN_EMERGENCIA = 20
 SOC_RAMPA_INICIO = 85 # SOC (%) em que a potência de carga começa a ser reduzida
 
+POT_MAX_BESS_RECARREGAR = 0.8
+
 # Aplicações (Constantes)
 ATIVAR_SUAVIZACAO_FV = True
 JANELA_SUAVIZACAO_MINUTOS = 15 # Define a "suavidade" da rampa.
@@ -149,19 +151,20 @@ def _run_simulation_detailed(
         geracao_fv_meta = vetor_geracao_fv_suavizada[i]
         hora_do_dia = vetor_tempo[i] % 24
 
-        bess_potencia_disponivel_carga = bess_potencia_max_kw * 0.8
+        bess_potencia_disponivel_carga = bess_potencia_max_kw * POT_MAX_BESS_RECARREGAR # (%) de Potência Máxima que o BESS pode descarregar
         bess_potencia_disponivel_descarga = bess_potencia_max_kw
         potencia_bess_suavizacao = 0
 
-        fator_rampa_carga = 1.0 
+        fator_rampa_carga = 1.0 # Controlador Proporcional para Voltage Control
         if soc_percentual_atual > SOC_RAMPA_INICIO:
             fator_rampa_carga = (SOC_LIMITE_MAX - soc_percentual_atual) / (SOC_LIMITE_MAX - SOC_RAMPA_INICIO)
             fator_rampa_carga = max(0, min(1, fator_rampa_carga))
 
         if ATIVAR_SUAVIZACAO_FV and hora_do_dia >= 6 and hora_do_dia < 18:
             diferenca_fv = geracao_fv_bruta - geracao_fv_meta
-            if diferenca_fv > 0:
-                potencia_carregamento_alvo = min(diferenca_fv, bess_potencia_disponivel_carga)
+            # Verifica se há discrepância na suavização
+            if diferenca_fv > 10:
+                potencia_carregamento_alvo = min(diferenca_fv, bess_potencia_disponivel_carga) #Vê potência que será injetada
                 potencia_carregamento = potencia_carregamento_alvo * fator_rampa_carga
                 espaco_disponivel_kwh = max(0, (bess_capacidade_kwh * SOC_LIMITE_MAX / 100) - bess_soc_kwh)
                 energia_a_adicionar = (potencia_carregamento * passo_de_tempo_h) * EFICIENCIA_CARREGAMENTO
@@ -170,7 +173,7 @@ def _run_simulation_detailed(
                     bess_soc_kwh += energia_final_adicionada
                     potencia_bess_suavizacao = (energia_final_adicionada / EFICIENCIA_CARREGAMENTO) / passo_de_tempo_h
                     bess_potencia_disponivel_carga -= potencia_bess_suavizacao
-            elif diferenca_fv < 0:
+            elif diferenca_fv < 10:
                 potencia_descarga = min(-diferenca_fv, bess_potencia_disponivel_descarga)
                 soc_min_kwh_atual = bess_capacidade_kwh * (SOC_LIMITE_MIN_EMERGENCIA if potencia_carga_atual > carga_limite_emergencia else SOC_LIMITE_MIN_NORMAL) / 100
                 energia_disponivel_kwh = max(0, bess_soc_kwh - soc_min_kwh_atual)
@@ -228,6 +231,8 @@ def _run_simulation_detailed(
                 fv_despacho_para_carga = geracao_fv_para_despacho
                 gmg_meta_para_carga = potencia_carga_atual - fv_despacho_para_carga
                 bess_despacho_para_carga = 0
+
+
             gmgs_necessarios = np.ceil(gmg_meta_para_carga / gmg_potencia_max_por_unidade) if gmg_potencia_max_por_unidade > 0 else float('inf')
             vetor_gmgs_despachados[i] = min(numero_total_gmgs, gmgs_necessarios)
             gmg_despacho_para_carga = min(gmg_meta_para_carga, vetor_gmgs_despachados[i] * gmg_potencia_max_por_unidade)
