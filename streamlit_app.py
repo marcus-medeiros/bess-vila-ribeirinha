@@ -305,7 +305,7 @@ def _run_simulation_detailed(
             energia_final_drenada = min(energia_bruta_drenar, max(0, bess_soc_kwh - (bess_capacidade_kwh * SOC_LIMITE_MIN_EMERGENCIA / 100)))
             if energia_final_drenada > 0:
                 bess_soc_kwh -= energia_final_drenada
-                potencia_entregue_rede = (energia_final_drenada * EFICIENCIA_DESCARREGAMENTO) / passo_de_tempo_h
+                potencia_entregue_rede = (energia_final_drenada * EFICIENCIA_DESCARREGamento) / passo_de_tempo_h
                 potencia_descarga_bess_carga = -potencia_entregue_rede
                 potencia_total_bess += potencia_descarga_bess_carga
                 
@@ -641,65 +641,65 @@ def plot_graph_4(
 
 
 # ==============================================================================
-# 5. INTERFACE DO USUÁRIO (STREAMLIT SIDEBAR)
+# 5. INTERFACE DO USUÁRIO (STREAMLIT SIDEBAR) - MODIFICADO
 # ==============================================================================
 
 st.sidebar.header("Parâmetros de Simulação")
 
-st.sidebar.subheader("Geral")
-p_dias_simulacao = st.sidebar.number_input(
-    "Dias de Simulação (Gráficos 1 & 3)", 
-    min_value=1, value=3, step=1,
-    help="Duração da simulação de curto prazo."
-)
-p_carga_limite_emergencia = st.sidebar.number_input(
-    "Carga Limite de Emergência (kW)", 
-    min_value=50.0, value=100.0, step=10.0,
-    help="Nível de carga que aciona o SOC de emergência do BESS."
-)
+# --- MODIFICAÇÃO AQUI: Usando st.sidebar.expander ---
+with st.sidebar.expander("⚙️ Geral", expanded=True):
+    p_dias_simulacao = st.number_input(
+        "Dias de Simulação (Gráficos 1 & 3)", 
+        min_value=1, value=3, step=1,
+        help="Duração da simulação de curto prazo."
+    )
+    p_carga_limite_emergencia = st.number_input(
+        "Carga Limite de Emergência (kW)", 
+        min_value=50.0, value=100.0, step=10.0,
+        help="Nível de carga que aciona o SOC de emergência do BESS."
+    )
 
-st.sidebar.subheader("Sistema Fotovoltaico (FV)")
-p_potencia_pico_base_fv = st.sidebar.number_input(
-    "Potência Pico FV (kWp Base)", 
-    min_value=0.0, value=450.0, step=10.0, 
-    help="Potência de pico instalada do sistema FV."
-)
-p_ceu_aberto = st.sidebar.slider(
-    "Fator Céu Aberto (Irradiação)", 
-    min_value=0.0, max_value=1.0, value=1.0, step=0.05,
-    help="Fator de ajuste da irradiação (1.0 = céu limpo, 0.0 = sem sol)."
-)
+with st.sidebar.expander("☀️ Sistema Fotovoltaico (FV)"):
+    p_potencia_pico_base_fv = st.number_input(
+        "Potência Pico FV (kWp Base)", 
+        min_value=0.0, value=450.0, step=10.0, 
+        help="Potência de pico instalada do sistema FV."
+    )
+    p_ceu_aberto = st.slider(
+        "Fator Céu Aberto (Irradiação)", 
+        min_value=0.0, max_value=1.0, value=1.0, step=0.05,
+        help="Fator de ajuste da irradiação (1.0 = céu limpo, 0.0 = sem sol)."
+    )
 
-st.sidebar.subheader("Bateria (BESS)")
-p_bess_capacidade_kwh = st.sidebar.number_input(
-    "Capacidade BESS (kWh)", 
-    min_value=0.0, value=750.0, step=50.0
-)
-p_bess_potencia_max_kw = st.sidebar.number_input(
-    "Potência BESS (kW)", 
-    min_value=0.0, value=200.0, step=10.0
-)
-p_soc_inicial_percent = st.sidebar.slider(
-    "SOC Inicial BESS (%)", 
-    min_value=0.0, max_value=100.0, value=38.0, step=1.0,
-    help="Estado de Carga inicial para a simulação de curto prazo."
-)
+with st.sidebar.expander("🔋 Bateria (BESS)"):
+    p_bess_capacidade_kwh = st.number_input(
+        "Capacidade BESS (kWh)", 
+        min_value=0.0, value=750.0, step=50.0
+    )
+    p_bess_potencia_max_kw = st.number_input(
+        "Potência BESS (kW)", 
+        min_value=0.0, value=200.0, step=10.0
+    )
+    p_soc_inicial_percent = st.slider(
+        "SOC Inicial BESS (%)", 
+        min_value=0.0, max_value=100.0, value=38.0, step=1.0,
+        help="Estado de Carga inicial para a simulação de curto prazo."
+    )
 
-st.sidebar.subheader("Geradores (GMG)")
-p_numero_total_gmgs = st.sidebar.number_input(
-    "Número de Geradores (GMG)", 
-    min_value=1, value=10, step=1
-)
-p_gmg_potencia_unitaria = st.sidebar.number_input(
-    "Potência Unitária GMG (kW)", 
-    min_value=10.0, value=20.0, step=1.0
-)
-p_gmg_fator_potencia_eficiente = st.sidebar.slider(
-    "Fator de Potência Eficiente GMG", 
-    min_value=0.1, max_value=1.0, value=0.80, step=0.05,
-    help="Fator de carga para operação eficiente do GMG."
-)
-
+with st.sidebar.expander("🏭 Geradores (GMG)"):
+    p_numero_total_gmgs = st.number_input(
+        "Número de Geradores (GMG)", 
+        min_value=1, value=10, step=1
+    )
+    p_gmg_potencia_unitaria = st.number_input(
+        "Potência Unitária GMG (kW)", 
+        min_value=10.0, value=20.0, step=1.0
+    )
+    p_gmg_fator_potencia_eficiente = st.slider(
+        "Fator de Potência Eficiente GMG", 
+        min_value=0.1, max_value=1.0, value=0.80, step=0.05,
+        help="Fator de carga para operação eficiente do GMG."
+    )
 
 # ==============================================================================
 # 6. EXECUÇÃO PRINCIPAL E PLOTAGEM (DESIGN MODIFICADO COM ABAS)
