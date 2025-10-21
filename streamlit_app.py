@@ -239,21 +239,34 @@ def _run_simulation_detailed(
                 deficit = potencia_carga_atual - fv_despacho_para_carga
                 bess_despacho_para_carga = 0.75 * deficit
                 gmg_meta_para_carga = 0.25 * deficit
-            else:  # Caso não haja geração excedente
+            else:
                 fv_despacho_para_carga = geracao_fv_para_despacho
                 gmg_meta_para_carga = potencia_carga_atual - fv_despacho_para_carga
-                
-                # Manter a suavização de potência FV (sem suportar carga)
+
                 if soc_percentual_atual > SOC_LIMITE_MIN_EMERGENCIA:
                     variacao_fv = geracao_fv_bruta - geracao_fv_para_despacho
-                    # Aplica um fator de suavização pequeno para compensar oscilações rápidas
                     bess_potencia_suavizacao = np.clip(
-                        variacao_fv * 0.3,  # fator de 30% da oscilação FV
+                        variacao_fv * 0.3,
                         -bess_potencia_disponivel_carga,
                         bess_potencia_disponivel_descarga
                     )
                 else:
                     bess_potencia_suavizacao = 0
+
+                # >>> BLOCO NOVO AQUI <<<
+                if abs(bess_potencia_suavizacao) > 1e-3:
+                    energia_suavizacao = abs(bess_potencia_suavizacao) * passo_de_tempo_h
+                    if bess_potencia_suavizacao > 0:
+                        energia_adicionada = energia_suavizacao * EFICIENCIA_CARREGAMENTO
+                        bess_soc_kwh = min(bess_soc_kwh + energia_adicionada,
+                                        bess_capacidade_kwh * SOC_LIMITE_MAX / 100)
+                    else:
+                        energia_removida = energia_suavizacao / EFICIENCIA_DESCARREGAMENTO
+                        bess_soc_kwh = max(bess_soc_kwh - energia_removida,
+                                        bess_capacidade_kwh * SOC_LIMITE_MIN_EMERGENCIA / 100)
+
+                    potencia_total_bess += bess_potencia_suavizacao
+
 
 
             #Calcula o número de GMG
