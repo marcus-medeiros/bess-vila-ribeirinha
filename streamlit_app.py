@@ -204,9 +204,9 @@ def run_short_term_simulation(
             if bess_pode_ajudar:
                 bess_despacho_para_carga = min(carga_restante, bess_potencia_disponivel_descarga)
         else: # Dia com Sol
-            if geracao_fv_para_despacho >= (potencia_carga_atual * 0.75):
-                gmg_meta_para_carga = 0.25 * potencia_carga_atual
-                fv_despacho_para_carga = 0.75 * potencia_carga_atual
+            if geracao_fv_para_despacho >= (potencia_carga_atual * 0.85):
+                gmg_meta_para_carga = 0.15 * potencia_carga_atual
+                fv_despacho_para_carga = 0.85 * potencia_carga_atual
                 excesso_fv_real = geracao_fv_bruta - fv_despacho_para_carga
                 bess_carga_pelo_fv = max(0, excesso_fv_real)
             elif geracao_fv_para_despacho > 0 and soc_percentual_atual > 75:
@@ -638,8 +638,8 @@ def calculate_annual_diesel_consumption(
     factors_and_weights = {
         1.0: 0.40, # 40% Céu Aberto
         0.5: 0.30, # 30% Nublado
-        0.2: 0.10, # 10% Tempestade (Correção: Era 0.2 antes, ajustado para 0.1)
-        0.0: 0.20  # 20% Sem Sol (Para somar 100%)
+        0.2: 0.20, # 10% Tempestade (Correção: Era 0.2 antes, ajustado para 0.1)
+        0.0: 0.10  # 20% Sem Sol (Para somar 100%)
     }
     
     total_diesel_ponderado_diario = 0.0
