@@ -750,8 +750,8 @@ def plot_graph_4(
 
         # Eixo X: 0 a 1000 kWh em 11 passos (0, 100, 200...)
         bess_range_kwh = np.linspace(250, 1250, 11)
-        # Linhas: 0 a 1000 kWp em 5 passos (250, 500, 750, 1000, 1250)
-        fv_range_kwp = np.linspace(0, 1250, 5)
+        # Linhas: 0 a 1000 kWp em 5 passos (0, 250, 500, 750, 1000, 1250)
+        fv_range_kwp = np.linspace(0, 1250, 6)
 
         total_sims = len(bess_range_kwh) * len(fv_range_kwp)
         progress_bar = st.progress(0.0)
