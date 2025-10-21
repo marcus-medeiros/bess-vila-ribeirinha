@@ -39,6 +39,8 @@ CAPACIDADE_TOTAL_DIESEL_L = 12000
 SFC = 0.285 # Fator de Consumo Específico: L/kWh
 
 # Perfil de Geração FV (Constante)
+LIMIAR_SUAVIZACAO = 0.02  # em fração da potência nominal FV (2%)
+
 FATOR_GERACAO_HORARIA = {
     6: 0.1, 7: 0.3, 8: 0.5, 9: 0.65, 10: 0.72, 11: 0.75, 12: 0.73,
     13: 0.68, 14: 0.58, 15: 0.45, 16: 0.28, 17: 0.1, 18: 0.0
@@ -162,10 +164,11 @@ def _run_simulation_detailed(
 
         if ATIVAR_SUAVIZACAO_FV and hora_do_dia >= 6 and hora_do_dia < 18:
             diferenca_fv = geracao_fv_bruta - geracao_fv_meta
+            # Ignorar variações pequenas
+            if abs(diferenca_fv) < LIMIAR_SUAVIZACAO * potencia_pico_fv_base:
+                diferenca_fv = 0  # Sem suavização para pequenas oscilações
             # Verifica se há discrepância na suavização
-            if diferenca_fv > 15:
-                print(diferenca_fv)
-                print("/n")
+            if diferenca_fv > 0:
                 potencia_carregamento_alvo = min(diferenca_fv, bess_potencia_disponivel_carga) #Vê potência que será injetada
                 potencia_carregamento = potencia_carregamento_alvo * fator_rampa_carga
                 espaco_disponivel_kwh = max(0, (bess_capacidade_kwh * SOC_LIMITE_MAX / 100) - bess_soc_kwh)
@@ -175,7 +178,7 @@ def _run_simulation_detailed(
                     bess_soc_kwh += energia_final_adicionada
                     potencia_bess_suavizacao = (energia_final_adicionada / EFICIENCIA_CARREGAMENTO) / passo_de_tempo_h
                     bess_potencia_disponivel_carga -= potencia_bess_suavizacao
-            elif diferenca_fv < 15:
+            elif diferenca_fv < 0:
                 potencia_descarga = min(-diferenca_fv, bess_potencia_disponivel_descarga)
                 soc_min_kwh_atual = bess_capacidade_kwh * (SOC_LIMITE_MIN_EMERGENCIA if potencia_carga_atual > carga_limite_emergencia else SOC_LIMITE_MIN_NORMAL) / 100
                 energia_disponivel_kwh = max(0, bess_soc_kwh - soc_min_kwh_atual)
