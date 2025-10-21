@@ -349,15 +349,15 @@ def _simular_autonomia_interna(
                 bess_despacho_para_carga = 0
         else: # Período Diurno
             if geracao_fv_atual > 0:
-                if geracao_fv_atual >= (potencia_carga_atual * 0.75):
-                    gmg_meta_para_carga = 0.25 * potencia_carga_atual
-                    fv_despacho_para_carga = 0.75 * potencia_carga_atual
+                if geracao_fv_atual >= (potencia_carga_atual * 0.80):
+                    gmg_meta_para_carga = 0.20 * potencia_carga_atual
+                    fv_despacho_para_carga = 0.80 * potencia_carga_atual
                     bess_carga_pelo_fv = geracao_fv_atual - fv_despacho_para_carga
-                elif geracao_fv_atual > 0 and soc_percentual_atual > 75:
+                elif geracao_fv_atual > 0 and soc_percentual_atual > 80:
                     fv_despacho_para_carga = geracao_fv_atual
                     deficit = potencia_carga_atual - fv_despacho_para_carga
-                    bess_despacho_para_carga = 0.75 * deficit
-                    gmg_meta_para_carga = 0.25 * deficit
+                    bess_despacho_para_carga = 0.80 * deficit
+                    gmg_meta_para_carga = 0.20 * deficit
                 else:
                     fv_despacho_para_carga = geracao_fv_atual
                     gmg_meta_para_carga = potencia_carga_atual - fv_despacho_para_carga
@@ -381,7 +381,7 @@ def _simular_autonomia_interna(
 
         # Atualização do BESS (Simplificado)
         limite_carga_por_passo_kwh = bess_capacidade_kwh * 0.13 * passo_de_tempo_h_longo
-        if bess_carga_pelo_fv > 0 and hora_do_dia < 15:
+        if bess_carga_pelo_fv > 0 and hora_do_dia < 17:
             potencia_carregamento_max_fv = min(bess_carga_pelo_fv, bess_potencia_max_kw)
             bess_soc_max_kwh = bess_capacidade_kwh * 0.90
             espaco_disponivel_kwh = max(0, bess_soc_max_kwh - bess_soc_kwh_longo)
@@ -813,7 +813,7 @@ p_carga_limite_emergencia = st.sidebar.number_input(
 st.sidebar.subheader("Sistema Fotovoltaico (FV)")
 p_potencia_pico_base_fv = st.sidebar.number_input(
     "Potência Pico FV (kWp Base)", 
-    min_value=50.0, value=450.0, step=10.0,
+    min_value=250, value=450.0, step=10.0,
     help="Potência de pico instalada do sistema FV."
 )
 p_ceu_aberto = st.sidebar.slider(
@@ -825,11 +825,11 @@ p_ceu_aberto = st.sidebar.slider(
 st.sidebar.subheader("Bateria (BESS)")
 p_bess_capacidade_kwh = st.sidebar.number_input(
     "Capacidade BESS (kWh)", 
-    min_value=10.0, value=750.0, step=50.0 
+    min_value=250, value=750.0, step=50.0 
 )
 p_bess_potencia_max_kw = st.sidebar.number_input(
     "Potência BESS (kW)", 
-    min_value=10.0, value=200.0, step=10.0
+    min_value=200, value=200.0, step=10.0
 )
 p_soc_inicial_percent = st.sidebar.slider(
     "SOC Inicial BESS (%)", 
