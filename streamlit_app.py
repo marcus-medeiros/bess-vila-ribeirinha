@@ -583,8 +583,8 @@ def calculate_annual_diesel_consumption(
     factors_and_weights = {
         1.0: 0.40,
         0.5: 0.30,
-        0.2: 0.10,
-        0.0: 0.20  # Assumindo 20% de dias sem sol para completar 100%
+        0.2: 0.20,
+        0.0: 0.10  # Assumindo 20% de dias sem sol para completar 100%
     }
     
     total_diesel_ponderado_diario = 0.0
