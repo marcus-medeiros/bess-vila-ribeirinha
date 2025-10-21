@@ -94,6 +94,7 @@ def _run_simulation_detailed(
     vetor_carga = np.interp(vetor_tempo, pontos_de_tempo_horarios, carga_horaria_dias)
     
     # FV
+    # potencia_pico_fv_curto é a potência efetiva após perdas e irradiação
     potencia_pico_fv_curto = potencia_pico_fv_base * EFICIENCIA_FV * fator_irradiacao
     
     # BESS
@@ -209,9 +210,15 @@ def _run_simulation_detailed(
         bess_pode_ajudar = (soc_percentual_atual > SOC_LIMITE_MIN_NORMAL) or \
                            (potencia_carga_atual > carga_limite_emergencia and soc_percentual_atual > SOC_LIMITE_MIN_EMERGENCIA)
         
+        # =================================================================
+        # --- A CORREÇÃO ESTÁ AQUI ---
+        # =================================================================
         # Se não houver planta FV (potência de pico EFETIVA é zero), o BESS não deve operar
         if potencia_pico_fv_curto <= 1e-6: # Usamos 1e-6 para evitar problemas com float
             bess_pode_ajudar = False
+        # =================================================================
+        # --- FIM DA CORREÇÃO ---
+        # =================================================================
 
         # Ajuda do BESS ponderada!
         if hora_do_dia < 6 or hora_do_dia >= 17 or geracao_fv_bruta <= 0:
@@ -306,7 +313,7 @@ def _run_simulation_detailed(
             if energia_final_drenada > 0:
                 bess_soc_kwh -= energia_final_drenada
                 
-                # --- CORREÇÃO APLICADA AQUI ---
+                # --- CORREÇÃO APLICADA AQUI (do erro anterior) ---
                 potencia_entregue_rede = (energia_final_drenada * EFICIENCIA_DESCARREGAMENTO) / passo_de_tempo_h
                 
                 potencia_descarga_bess_carga = -potencia_entregue_rede
