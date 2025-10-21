@@ -415,7 +415,7 @@ def calculate_annual_diesel_consumption(
 ):
     """Calcula o consumo anual ponderado de diesel usando a simulação DETALHADA."""
     gmg_potencia_max_por_unidade = gmg_potencia_unitaria * gmg_fator_potencia_eficiente
-    soc_inicial_kwh = bess_capacidade_kwh * 0.4 
+    soc_inicial_kwh = bess_capacidade_kwh * 0.2 
 
     factors_and_weights = {
         1.0: 0.40, # 40% Céu Aberto
