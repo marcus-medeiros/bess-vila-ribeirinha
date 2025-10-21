@@ -349,13 +349,13 @@ def calculate_annual_diesel_consumption(
 ):
     """Calcula o consumo anual ponderado de diesel usando a simulação DETALHADA."""
     gmg_potencia_max_por_unidade = gmg_potencia_unitaria * gmg_fator_potencia_eficiente
-    soc_inicial_kwh = bess_capacidade_kwh * 0.5 
+    soc_inicial_kwh = bess_capacidade_kwh * 0.4 
 
     factors_and_weights = {
         1.0: 0.40, # 40% Céu Aberto
         0.5: 0.30, # 30% Nublado
-        0.2: 0.10, # 10% Tempestade
-        0.0: 0.20  # 20% Sem Sol
+        0.2: 0.20, # 20% Tempestade
+        0.0: 0.10  # 10% Sem Sol
     }
     
     total_diesel_ponderado_diario = 0.0
@@ -524,23 +524,12 @@ def plot_graph_4(
     4.  **Média Anual Ponderada:** Assumimos uma distribuição anual desses dias:
         * 40% Céu Aberto
         * 30% Nublado
-        * 10% Tempestade
-        * 20% Sem Sol
+        * 20% Tempestade
+        * 10% Sem Sol
         Calculamos a média diária de consumo de diesel usando esses pesos.
     5.  **Consumo Anual:** Multiplicamos a média diária ponderada por 365 para estimar o consumo anual total de diesel em Litros.
     """)
     
-    with st.expander("Por que o consumo de diesel pode aumentar com um BESS maior?"):
-        st.markdown("""
-        Esta é uma observação contraintuitiva que pode ocorrer devido a uma combinação da **lógica de despacho** e das **perdas de eficiência**.
-        
-        1.  **GMG com Operação Mínima Diurna:** A lógica atual instrui o GMG a cobrir **obrigatoriamente 15% a 25% da carga** durante períodos de alta geração solar (`geracao_fv >= carga * 0.75`). Nessa situação, mesmo que haja excesso de sol, o GMG continua operando. Um BESS maior simplesmente armazena mais dessa energia solar que já era excedente, sem reduzir a operação do GMG naquele momento.
-        
-        2.  **Perdas de Eficiência (Round-Trip):** A energia armazenada na bateria não é 100% recuperada. O ciclo completo (carga e descarga) tem uma eficiência de ~82%. Quando um BESS maior armazena mais energia solar excedente e a descarrega à noite, as perdas absolutas (em kWh) são maiores. Por exemplo, perder 18% de 500 kWh é mais do que perder 18% de 100 kWh.
-        
-        **Conclusão:** A energia perdida no ciclo de uma bateria maior precisa ser compensada. Se o sistema não consegue compensar com mais FV (à noite ou em dias nublados), essa compensação recai sobre o GMG. Portanto, um BESS superdimensionado, combinado com uma lógica que não desliga completamente o GMG durante o dia, pode levar a um aumento marginal no consumo de diesel devido às perdas de ciclo se tornando mais significativas do que a energia solar deslocada no tempo.
-        """)
-
     if st.button("Executar Análise de Sensibilidade (Gráfico 4)", key="run_sens_analysis"):
         with st.spinner("Executando análise de sensibilidade... Isso pode levar alguns minutos."):
             fig, ax = plt.subplots(figsize=(14, 8))
