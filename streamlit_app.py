@@ -26,7 +26,7 @@ EFICIENCIA_DESCARREGAMENTO = np.sqrt(BESS_EFICIENCIA_CICLO_COMPLETO)
 SOC_LIMITE_MAX = 90
 SOC_LIMITE_MIN_NORMAL = 40
 SOC_LIMITE_MIN_EMERGENCIA = 20
-SOC_RAMPA_INICIO = 85 # SOC (%) em que a potência de carga começa a ser reduzida
+SOC_RAMPA_INICIO = 80 # SOC (%) em que a potência de carga começa a ser reduzida
 
 # Aplicações (Constantes)
 ATIVAR_SUAVIZACAO_FV = True
