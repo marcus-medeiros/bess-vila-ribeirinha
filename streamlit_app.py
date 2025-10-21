@@ -453,7 +453,7 @@ def plot_graph_1(
     eixos1[0].plot(vetor_tempo, vetor_geracao_fv_original, label='Geração FV Original (kW)', color='gold', alpha=0.9, linestyle=':', zorder=4)
     eixos1[0].fill_between(vetor_tempo, vetor_geracao_fv_suavizada, label='Geração FV Suavizada (Meta)', color='darkorange', linewidth=2.5, alpha= 0.3, zorder=5)
     eixos1[0].fill_between(vetor_tempo, vetor_gmg_potencia_despachada, color='gray', alpha=0.6, zorder=2, label='Potência GMG Despachada (kW)')
-    eixos1[0].fill_between(vetor_tempo, 0, -vetor_potencia_bess, where=(vetor_potencia_bess >= 0), hatch='//', edgecolor='green', facecolor='lightgreen', alpha=0.7, label='BESS Carregando (kW)', zorder=3)
+    eixos1[0].fill_between(vetor_tempo, 0, -vetor_potencia_bess, where=(vetor_potencia_bess >= 0), hatch='//', edgecolor='green', facecolor='lightgreen', alpha=0.7, label='BESS Recarregando (kW)', zorder=3)
     eixos1[0].fill_between(vetor_tempo, 0, -vetor_potencia_bess, where=(vetor_potencia_bess < 0), hatch='\\', edgecolor='red', facecolor='lightcoral', alpha=0.7, label='BESS Descarregando (kW)', zorder=3)
     eixos1[0].set_ylabel('Potência (kW)', fontsize=12)
     eixos1[0].set_title(f'Simulação com Suavização FV | BESS: {bess_capacidade_kwh} kWh | PV: {potencia_pico_fv_curto:.2f} kWp ({dias_simulacao*24} Horas)', fontsize=16)
