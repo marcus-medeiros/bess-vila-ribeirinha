@@ -19,10 +19,10 @@ EFICIENCIA_FV = 0.75
 DADOS_CARGA_HORARIA_STR = "17.000-17.000-17.000-17.000-17.000-20.000-34.000-39.000-45.000-50.000-65.000-85.000-80.000-75.000-60.000-42.000-50.000-84.000-150.000-79.000-61.000-45.000-30.000-25.000"
 CARGA_HORARIA_24H = [float(val.replace('.', ''))/1000 for val in DADOS_CARGA_HORARIA_STR.split('-')]
 
-# BESS (Constantes)
+# BESS (Constantes) DADOS DO CASE DO BESS
 BESS_EFICIENCIA_CICLO_COMPLETO = 0.82
-EFICIENCIA_CARREGAMENTO = np.sqrt(BESS_EFICIENCIA_CICLO_COMPLETO)
-EFICIENCIA_DESCARREGAMENTO = np.sqrt(BESS_EFICIENCIA_CICLO_COMPLETO)
+EFICIENCIA_CARREGAMENTO = 0.86
+EFICIENCIA_DESCARREGAMENTO = 0.96
 
 SOC_LIMITE_MAX_SUA = 92
 SOC_LIMITE_MAX = 90
@@ -41,7 +41,7 @@ CAPACIDADE_TOTAL_DIESEL_L = 12000
 SFC = 0.285 # Fator de Consumo Específico: L/kWh
 
 # Perfil de Geração FV (Constante)
-LIMIAR_SUAVIZACAO = 0.0  # em fração da potência nominal FV (2%)
+LIMIAR_SUAVIZACAO = 0.02  # em fração da potência nominal FV (2%)
 
 FATOR_GERACAO_HORARIA = {
     6: 0.1, 7: 0.3, 8: 0.5, 9: 0.65, 10: 0.72, 11: 0.75, 12: 0.73,
@@ -196,15 +196,17 @@ def _run_simulation_detailed(
         bess_despacho_para_carga = 0
         bess_carga_pelo_fv = 0
         fv_despacho_para_carga = 0
+        # Calculando novamente o SOC Atual para outras aplicações
         soc_percentual_atual = (bess_soc_kwh / bess_capacidade_kwh) * 100 if bess_capacidade_kwh > 1e-6 else 0
+        # Verificando se o BESS pode contribuir para as aplicações de peak shaving ou arbitragem
         bess_pode_ajudar = (soc_percentual_atual > SOC_LIMITE_MIN_NORMAL) or \
                          (potencia_carga_atual > carga_limite_emergencia and soc_percentual_atual > SOC_LIMITE_MIN_EMERGENCIA)
         
-        # --- IMPLEMENTAÇÃO DA REGRA DE NEGÓCIO ---
-        # Se não houver planta FV, o BESS não deve operar.
+        # Se não houver planta FV, o BESS não deve operar, pois o BESS não faz sentido carregar com o GMG
         if potencia_pico_fv_base <= 0:
             bess_pode_ajudar = False
 
+        # Ajuda do BESS ponderada!
         if hora_do_dia < 6 or hora_do_dia >= 17 or geracao_fv_bruta <= 0:
             if bess_pode_ajudar:
                 if soc_percentual_atual > 75: gmg_meta_para_carga = 0.25 * potencia_carga_atual
@@ -212,11 +214,14 @@ def _run_simulation_detailed(
                 elif soc_percentual_atual > 50: gmg_meta_para_carga = 0.5 * potencia_carga_atual
                 else: gmg_meta_para_carga = 0.6 * potencia_carga_atual
             else:
-                gmg_meta_para_carga = potencia_carga_atual
+                gmg_meta_para_carga = potencia_carga_atual #Caso o BESS não possa atuar, o GMG deve assumir toda a carga
+
             potencia_unitaria_a_usar = gmg_potencia_max_por_unidade
             capacidade_eficiente_total = numero_total_gmgs * gmg_potencia_max_por_unidade
+
             if not bess_pode_ajudar and gmg_meta_para_carga > capacidade_eficiente_total:
                 potencia_unitaria_a_usar = gmg_potencia_unitaria
+
             gmgs_necessarios = np.ceil(gmg_meta_para_carga / potencia_unitaria_a_usar) if potencia_unitaria_a_usar > 0 else float('inf')
             vetor_gmgs_despachados[i] = min(numero_total_gmgs, gmgs_necessarios)
             gmg_despacho_para_carga = min(gmg_meta_para_carga, vetor_gmgs_despachados[i] * potencia_unitaria_a_usar)
@@ -224,9 +229,9 @@ def _run_simulation_detailed(
             if bess_pode_ajudar:
                 bess_despacho_para_carga = min(carga_restante, bess_potencia_disponivel_descarga)
         else:
-            if geracao_fv_para_despacho >= (potencia_carga_atual * 0.75):
-                gmg_meta_para_carga = 0.25 * potencia_carga_atual
-                fv_despacho_para_carga = 0.75 * potencia_carga_atual
+            if geracao_fv_para_despacho >= (potencia_carga_atual * 0.85):
+                gmg_meta_para_carga = 0.15 * potencia_carga_atual
+                fv_despacho_para_carga = 0.85 * potencia_carga_atual
                 excesso_fv_real = geracao_fv_bruta - fv_despacho_para_carga
                 bess_carga_pelo_fv = max(0, excesso_fv_real)
             elif geracao_fv_para_despacho > 0 and soc_percentual_atual > 75:
@@ -234,12 +239,12 @@ def _run_simulation_detailed(
                 deficit = potencia_carga_atual - fv_despacho_para_carga
                 bess_despacho_para_carga = 0.75 * deficit
                 gmg_meta_para_carga = 0.25 * deficit
-            else:
+            else: # Caso não haja geração excedente
                 fv_despacho_para_carga = geracao_fv_para_despacho
                 gmg_meta_para_carga = potencia_carga_atual - fv_despacho_para_carga
-                bess_despacho_para_carga = 0
+                bess_despacho_para_carga = 0 #BESS não atua, apenas GMG e FV
 
-
+            #Calcula o número de GMG
             gmgs_necessarios = np.ceil(gmg_meta_para_carga / gmg_potencia_max_por_unidade) if gmg_potencia_max_por_unidade > 0 else float('inf')
             vetor_gmgs_despachados[i] = min(numero_total_gmgs, gmgs_necessarios)
             gmg_despacho_para_carga = min(gmg_meta_para_carga, vetor_gmgs_despachados[i] * gmg_potencia_max_por_unidade)
