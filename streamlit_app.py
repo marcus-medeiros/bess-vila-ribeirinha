@@ -209,10 +209,10 @@ def _run_simulation_detailed(
         # Ajuda do BESS ponderada!
         if hora_do_dia < 6 or hora_do_dia >= 17 or geracao_fv_bruta <= 0:
             if bess_pode_ajudar:
-                if soc_percentual_atual > 75: gmg_meta_para_carga = 0.25 * potencia_carga_atual
-                elif soc_percentual_atual > 60: gmg_meta_para_carga = 0.4 * potencia_carga_atual
-                elif soc_percentual_atual > 50: gmg_meta_para_carga = 0.5 * potencia_carga_atual
-                else: gmg_meta_para_carga = 0.6 * potencia_carga_atual
+                if soc_percentual_atual > 75: gmg_meta_para_carga = 0.5 * potencia_carga_atual
+                elif soc_percentual_atual > 60: gmg_meta_para_carga = 0.55 * potencia_carga_atual
+                elif soc_percentual_atual > 50: gmg_meta_para_carga = 0.6 * potencia_carga_atual
+                else: gmg_meta_para_carga = 0.75 * potencia_carga_atual
             else:
                 gmg_meta_para_carga = potencia_carga_atual #Caso o BESS não possa atuar, o GMG deve assumir toda a carga
 
