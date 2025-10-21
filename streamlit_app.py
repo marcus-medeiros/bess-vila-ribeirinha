@@ -41,7 +41,7 @@ CAPACIDADE_TOTAL_DIESEL_L = 12000
 SFC = 0.285 # Fator de Consumo Específico: L/kWh
 
 # Perfil de Geração FV (Constante)
-LIMIAR_SUAVIZACAO = 0.02  # em fração da potência nominal FV (2%)
+LIMIAR_SUAVIZACAO = 0.0  # em fração da potência nominal FV (2%)
 
 FATOR_GERACAO_HORARIA = {
     6: 0.1, 7: 0.3, 8: 0.5, 9: 0.65, 10: 0.72, 11: 0.75, 12: 0.73,
