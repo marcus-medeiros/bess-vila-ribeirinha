@@ -147,7 +147,7 @@ def run_short_term_simulation(
         potencia_bess_suavizacao = 0
 
         # Lógica de Rampa de Carregamento
-        fator_rampa_carga = 1
+        fator_rampa_carga = 0.5
         if soc_percentual_atual > SOC_RAMPA_INICIO:
             fator_rampa_carga = (SOC_LIMITE_MAX - soc_percentual_atual) / (SOC_LIMITE_MAX - SOC_RAMPA_INICIO)
             fator_rampa_carga = max(0, min(1, fator_rampa_carga))
