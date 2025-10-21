@@ -242,7 +242,16 @@ def _run_simulation_detailed(
             else: # Caso não haja geração excedente
                 fv_despacho_para_carga = geracao_fv_para_despacho
                 gmg_meta_para_carga = potencia_carga_atual - fv_despacho_para_carga
-                bess_despacho_para_carga = 0 #BESS não atua, apenas GMG e FV
+                
+                # Permitir que o BESS continue fazendo suavização mesmo sem excedente FV
+                if soc_percentual_atual > SOC_LIMITE_MIN_EMERGENCIA:
+                    deficit = potencia_carga_atual - fv_despacho_para_carga
+                    bess_despacho_para_carga = min(deficit * 0.3, bess_potencia_disponivel_descarga)
+                    gmg_meta_para_carga -= bess_despacho_para_carga
+                    gmg_meta_para_carga = max(0, gmg_meta_para_carga)
+                else:
+                    bess_despacho_para_carga = 0  # BESS inativo por SOC crítico
+
 
             #Calcula o número de GMG
             gmgs_necessarios = np.ceil(gmg_meta_para_carga / gmg_potencia_max_por_unidade) if gmg_potencia_max_por_unidade > 0 else float('inf')
