@@ -759,7 +759,6 @@ def plot_graph_4(
 
         for fv_kwp in fv_range_kwp:
             diesel_results = []
-            st.write(f"Simulando para FV = {fv_kwp:.0f} kWp...") # Fornece feedback
             for bess_kwh in bess_range_kwh:
                 # Assume 0.5C C-rate: Potência (kW) = 0.5 * Capacidade (kWh)
                 bess_kw = bess_kwh * 0.5 
