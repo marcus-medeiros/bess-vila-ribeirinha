@@ -205,9 +205,9 @@ def run_short_term_simulation(
             if bess_pode_ajudar:
                 bess_despacho_para_carga = min(carga_restante, bess_potencia_disponivel_descarga)
         else:
-            if geracao_fv_para_despacho >= (potencia_carga_atual * 0.75):
-                gmg_meta_para_carga = 0.25 * potencia_carga_atual
-                fv_despacho_para_carga = 0.75 * potencia_carga_atual
+            if geracao_fv_para_despacho >= (potencia_carga_atual * 0.80):
+                gmg_meta_para_carga = 0.20 * potencia_carga_atual
+                fv_despacho_para_carga = 0.80 * potencia_carga_atual
                 excesso_fv_real = geracao_fv_bruta - fv_despacho_para_carga
                 bess_carga_pelo_fv = max(0, excesso_fv_real)
             elif geracao_fv_para_despacho > 0 and soc_percentual_atual > 75:
