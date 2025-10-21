@@ -45,7 +45,7 @@ JANELA_SUAVIZACAO_MINUTOS = 15 # Define a "suavidade" da rampa.
 
 # Diesel (Constantes)
 CAPACIDADE_TOTAL_DIESEL_L = 12000
-SFC = 0.285 # Fator de Consumo Específico: L/kWh
+SFC = 0.31 # Fator de Consumo Específico: L/kWh
 
 # Perfil de Geração FV (Constante)
 LIMIAR_SUAVIZACAO = 0.02  # em fração da potência nominal FV (2%)
@@ -614,7 +614,7 @@ def plot_graph_4(
             fig, ax = plt.subplots(figsize=(14, 8))
 
             bess_range_kwh = np.linspace(250, 1250, 11) 
-            fv_range_kwp = np.linspace(250, 1250, 5)   
+            fv_range_kwp = np.linspace(250, 1250, 11)   
 
             total_sims = len(bess_range_kwh) * len(fv_range_kwp)
             progress_bar = st.progress(0.0)
