@@ -575,7 +575,7 @@ def plot_graph_4(
 
             ax.set_xlabel('Capacidade BESS (kWh)')
             ax.set_ylabel('Consumo Anual Estimado de Diesel (L)')
-            ax.set_title('Consumo de Diesel vs. Dimensionamento BESS (variando FV)')
+            ax.set_title('Consumo de Diesel vs. Dimensionamento Microrredes')
             ax.legend()
             ax.grid(True, linestyle='--', alpha=0.7)
             ax.get_yaxis().set_major_formatter(plt.FuncFormatter(lambda x, loc: "{:,.0f}".format(x)))
