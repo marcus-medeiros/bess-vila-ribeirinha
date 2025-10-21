@@ -551,9 +551,6 @@ def plot_graph_3(
         eixos3.bar(horas_dia, gmg_horaria, label='GMG', color='gray', alpha=0.8)
         eixos3.bar(horas_dia, fv_carga_horaria, bottom=gmg_horaria, label='FV para Carga', color='orange', alpha=0.8)
         eixos3.bar(horas_dia, bess_descarga_horaria, bottom=gmg_horaria + fv_carga_horaria, label='BESS (descarga)', color='crimson', alpha=0.8)
-        
-        # Linha da carga total para referência
-        eixos3.plot(horas_dia, carga_horaria, label='Carga Total Média', color='blue', linestyle='--', marker='o')
 
         eixos3.set_xlabel('Horas', fontsize=12)
         eixos3.set_ylabel('Potência Média (kW)', fontsize=12)
