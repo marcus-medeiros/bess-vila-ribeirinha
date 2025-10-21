@@ -23,6 +23,8 @@ CARGA_HORARIA_24H = [float(val.replace('.', ''))/1000 for val in DADOS_CARGA_HOR
 BESS_EFICIENCIA_CICLO_COMPLETO = 0.82
 EFICIENCIA_CARREGAMENTO = np.sqrt(BESS_EFICIENCIA_CICLO_COMPLETO)
 EFICIENCIA_DESCARREGAMENTO = np.sqrt(BESS_EFICIENCIA_CICLO_COMPLETO)
+
+SOC_LIMITE_MAX_SUA = 92
 SOC_LIMITE_MAX = 90
 SOC_LIMITE_MIN_NORMAL = 40
 SOC_LIMITE_MIN_EMERGENCIA = 20
@@ -159,7 +161,7 @@ def _run_simulation_detailed(
 
         fator_rampa_carga = 1.0 # Controlador Proporcional para Voltage Control
         if soc_percentual_atual > SOC_RAMPA_INICIO:
-            fator_rampa_carga = (SOC_LIMITE_MAX - soc_percentual_atual) / (SOC_LIMITE_MAX - SOC_RAMPA_INICIO)
+            fator_rampa_carga = (SOC_LIMITE_MAX_SUA - soc_percentual_atual) / (SOC_LIMITE_MAX_SUA - SOC_RAMPA_INICIO)
             fator_rampa_carga = max(0, min(1, fator_rampa_carga))
 
         if ATIVAR_SUAVIZACAO_FV and hora_do_dia >= 6 and hora_do_dia < 18:
@@ -171,7 +173,7 @@ def _run_simulation_detailed(
             if diferenca_fv > 0:
                 potencia_carregamento_alvo = min(diferenca_fv, bess_potencia_disponivel_carga) #Vê potência que será injetada
                 potencia_carregamento = potencia_carregamento_alvo * fator_rampa_carga
-                espaco_disponivel_kwh = max(0, (bess_capacidade_kwh * SOC_LIMITE_MAX / 100) - bess_soc_kwh)
+                espaco_disponivel_kwh = max(0, (bess_capacidade_kwh * SOC_LIMITE_MAX_SUA / 100) - bess_soc_kwh)
                 energia_a_adicionar = (potencia_carregamento * passo_de_tempo_h) * EFICIENCIA_CARREGAMENTO
                 energia_final_adicionada = min(energia_a_adicionar, espaco_disponivel_kwh)
                 if energia_final_adicionada > 0:
