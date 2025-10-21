@@ -212,7 +212,7 @@ def _run_simulation_detailed(
                 if soc_percentual_atual > 75: gmg_meta_para_carga = 0.5 * potencia_carga_atual
                 elif soc_percentual_atual > 60: gmg_meta_para_carga = 0.55 * potencia_carga_atual
                 elif soc_percentual_atual > 50: gmg_meta_para_carga = 0.6 * potencia_carga_atual
-                else: gmg_meta_para_carga = 0.75 * potencia_carga_atual
+                else: gmg_meta_para_carga = 0.65 * potencia_carga_atual
             else:
                 gmg_meta_para_carga = potencia_carga_atual #Caso o BESS não possa atuar, o GMG deve assumir toda a carga
 
