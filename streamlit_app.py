@@ -15,8 +15,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-st.title("Simulador de Despacho de BESS e Autonomia de Diesel")
-
 # --- Constantes do Modelo (Não alteráveis pela UI) ---
 INTERVALOS_POR_HORA = 12 # Intervalos de 5 min (60/12 = 5 min)
 DIAS_SIMULACAO_LONGA = 120 # Limite de dias para o gráfico de autonomia
