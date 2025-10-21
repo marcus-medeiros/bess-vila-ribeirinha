@@ -28,7 +28,7 @@ SOC_LIMITE_MIN_NORMAL = 40
 SOC_LIMITE_MIN_EMERGENCIA = 20
 SOC_RAMPA_INICIO = 85 # SOC (%) em que a potência de carga começa a ser reduzida
 
-POT_MAX_BESS_RECARREGAR = 0.8
+POT_MAX_BESS_RECARREGAR = 0.9 # (%) da Potência Nominal
 
 # Aplicações (Constantes)
 ATIVAR_SUAVIZACAO_FV = True
