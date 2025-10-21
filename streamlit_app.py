@@ -349,9 +349,9 @@ def _simular_autonomia_interna(
                 bess_despacho_para_carga = 0
         else: # Período Diurno
             if geracao_fv_atual > 0:
-                if geracao_fv_atual >= (potencia_carga_atual * 0.75):
-                    gmg_meta_para_carga = 0.25 * potencia_carga_atual
-                    fv_despacho_para_carga = 0.75 * potencia_carga_atual
+                if geracao_fv_atual >= (potencia_carga_atual * 0.80):
+                    gmg_meta_para_carga = 0.20 * potencia_carga_atual
+                    fv_despacho_para_carga = 0.80 * potencia_carga_atual
                     bess_carga_pelo_fv = geracao_fv_atual - fv_despacho_para_carga
                 elif geracao_fv_atual > 0 and soc_percentual_atual > 75:
                     fv_despacho_para_carga = geracao_fv_atual
