@@ -106,7 +106,7 @@ def _run_simulation_detailed(
             valor_final_fv = valor_interpolado
             if use_noise:
                 ruido = np.random.normal(0, 0.08)
-                ruido = np.clip(ruido, -0.10, 0.10)
+                ruido = np.clip(ruido, -0.15, 0.15)
                 valor_final_fv = valor_interpolado * (1 + ruido)
             perfil_fv_24h[i] = max(0, valor_final_fv * potencia_pico_fv_curto)
         elif hora_base in FATOR_GERACAO_HORARIA:
@@ -114,7 +114,7 @@ def _run_simulation_detailed(
             valor_final_fv = valor
             if use_noise:
                 ruido = np.random.normal(0, 0.08)
-                ruido = np.clip(ruido, -0.10, 0.10)
+                ruido = np.clip(ruido, -0.15, 0.15)
                 valor_final_fv = valor * (1 + ruido)
             perfil_fv_24h[i] = max(0, valor_final_fv * potencia_pico_fv_curto)
 
