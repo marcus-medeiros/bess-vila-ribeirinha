@@ -576,7 +576,7 @@ def calculate_annual_diesel_consumption(
     """
     gmg_potencia_max_por_unidade = gmg_potencia_unitaria * gmg_fator_potencia_eficiente
     # Começa cada dia de simulação com 50% SOC para um caso médio
-    soc_inicial_kwh = bess_capacidade_kwh * 0.5 
+    soc_inicial_kwh = bess_capacidade_kwh * 0.2
 
     # Ponderação de dias no ano
     # 40% ceu_aberto=1.0, 30% ceu_aberto=0.5, 10% ceu_aberto=0.2, 20% ceu_aberto=0.0
