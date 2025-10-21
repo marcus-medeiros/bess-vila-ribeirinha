@@ -651,7 +651,7 @@ def plot_graph_4(
             for fv_kwp in fv_range_kwp:
                 diesel_results = []
                 for bess_kwh in bess_range_kwh:
-                    bess_kw = bess_kwh * 0.5 
+                    bess_kw = bess_kwh * 0.2 
                     bess_kwh_safe = max(bess_kwh, 1e-6) 
                     bess_kw_safe = max(bess_kw, 1e-6)
 
