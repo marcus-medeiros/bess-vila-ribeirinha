@@ -132,6 +132,10 @@ def run_short_term_simulation(
         vetor_soc_kwh[0] = bess_soc_kwh
 
     for i in range(numero_de_passos):
+        # Garante que o SOC do passo anterior seja usado se não for o primeiro passo
+        if i > 0:
+            bess_soc_kwh = vetor_soc_kwh[i-1] 
+            
         soc_percentual_atual = (bess_soc_kwh / bess_capacidade_kwh) * 100
         potencia_carga_atual = vetor_carga[i]
         geracao_fv_bruta = vetor_geracao_fv_original[i]
@@ -251,22 +255,17 @@ def run_short_term_simulation(
         vetor_gmg_potencia_despachada[i] = gmg_despacho_para_carga
         vetor_potencia_bess[i] = potencia_total_bess
         vetor_soc_kwh[i] = bess_soc_kwh
-        
-        # Atualiza o SOC para o próximo passo (exceto no último)
-        if i < numero_de_passos - 1:
-            vetor_soc_kwh[i+1] = bess_soc_kwh
-
 
     return (
         vetor_tempo, vetor_carga, vetor_geracao_fv_original, vetor_geracao_fv_suavizada,
         vetor_gmg_potencia_despachada, vetor_potencia_bess, vetor_soc_kwh, vetor_gmgs_despachados,
-        potencia_pico_fv_curto, numero_de_passos
+        potencia_pico_fv_curto, numero_de_passos, vetor_fv_para_carga  # <-- CORREÇÃO AQUI
     )
 
 def _simular_autonomia_interna(
     dias_simulacao, fator_irradiacao_fv, soc_inicial_kwh,
     potencia_pico_base_fv, bess_capacidade_kwh, bess_potencia_max_kw,
-    numero_total_gmgs, gmg_potencia_max_por_unidade, carga_limite_emergencia
+    numero_total_gmgs, gmg_potencia_max_por_unidade, gmg_potencia_unitaria, carga_limite_emergencia
 ):
     """Função interna para a simulação de longo prazo (lógica simplificada)."""
     
@@ -421,7 +420,7 @@ def run_long_term_simulation(
             _simular_autonomia_interna(
                 DIAS_SIMULACAO_LONGA, fator, soc_inicial_longo_kwh,
                 potencia_pico_base_fv, bess_capacidade_kwh, bess_potencia_max_kw,
-                numero_total_gmgs, gmg_potencia_max_por_unidade, carga_limite_emergencia
+                numero_total_gmgs, gmg_potencia_max_por_unidade, gmg_potencia_unitaria, carga_limite_emergencia
             )
         
         resultados_autonomia[nome] = {
@@ -458,7 +457,7 @@ def plot_graph_1(
     eixos1[0].set_ylim(-bess_potencia_max_kw * 1.1, None)
 
     # Gráfico de SOC
-    eixos1[1].plot(vetor_tempo, (vetor_soc_kwh / bess_capacidade_kwh) * 100, label='SOC do BESS (%)', color='purple', linewidth=2)
+    eixos1[1].plot(vetor_tempo, (vetor_soc_kwh / (bess_capacidade_kwh + 1e-6)) * 100, label='SOC do BESS (%)', color='purple', linewidth=2) # Adicionado 1e-6 para evitar divisão por zero
     eixos1[1].axhline(y=SOC_LIMITE_MAX, color='green', linestyle='--', linewidth=1.5, label=f'SOC Máximo ({SOC_LIMITE_MAX}%)')
     eixos1[1].axhline(y=SOC_RAMPA_INICIO, color='orange', linestyle=':', linewidth=2, label=f'Início da Rampa de Carga ({SOC_RAMPA_INICIO}%)')
     eixos1[1].axhline(y=SOC_LIMITE_MIN_NORMAL, color='red', linestyle='--', linewidth=1.5, label=f'SOC Mínimo Normal ({SOC_LIMITE_MIN_NORMAL}%)')
@@ -517,10 +516,22 @@ def plot_graph_3(
     
     indice_inicio_dia2 = 24 * INTERVALOS_POR_HORA
     if numero_de_passos > indice_inicio_dia2:
-        carga_dia2 = vetor_carga[indice_inicio_dia2:]
-        fv_para_carga_dia2 = vetor_fv_para_carga[indice_inicio_dia2:]
-        gmg_dia2 = vetor_gmg_potencia_despachada[indice_inicio_dia2:]
-        potencia_bess_total_dia2 = vetor_potencia_bess[indice_inicio_dia2:]
+        # Garante que peguemos apenas os dados do dia 2 em diante, até o fim
+        slice_dia2 = slice(indice_inicio_dia2, (indice_inicio_dia2 + 24 * INTERVALOS_POR_HORA))
+        
+        carga_dia2 = vetor_carga[slice_dia2]
+        fv_para_carga_dia2 = vetor_fv_para_carga[slice_dia2]
+        gmg_dia2 = vetor_gmg_potencia_despachada[slice_dia2]
+        potencia_bess_total_dia2 = vetor_potencia_bess[slice_dia2]
+        
+        # Se os dados do dia 2 estiverem incompletos (ex: simulação de 2.5 dias), preenchemos
+        expected_len = 24 * INTERVALOS_POR_HORA
+        if len(carga_dia2) < expected_len:
+            carga_dia2 = np.pad(carga_dia2, (0, expected_len - len(carga_dia2)), 'constant')
+            fv_para_carga_dia2 = np.pad(fv_para_carga_dia2, (0, expected_len - len(fv_para_carga_dia2)), 'constant')
+            gmg_dia2 = np.pad(gmg_dia2, (0, expected_len - len(gmg_dia2)), 'constant')
+            potencia_bess_total_dia2 = np.pad(potencia_bess_total_dia2, (0, expected_len - len(potencia_bess_total_dia2)), 'constant')
+
         
         bess_descarga_dia2 = np.maximum(0, -potencia_bess_total_dia2)
         
@@ -585,11 +596,11 @@ p_ceu_aberto = st.sidebar.slider(
 st.sidebar.subheader("Bateria (BESS)")
 p_bess_capacidade_kwh = st.sidebar.number_input(
     "Capacidade BESS (kWh)", 
-    min_value=100.0, value=750.0, step=50.0
+    min_value=10.0, value=750.0, step=50.0 # Alterado min_value para 10.0 para evitar divisão por zero
 )
 p_bess_potencia_max_kw = st.sidebar.number_input(
     "Potência BESS (kW)", 
-    min_value=50.0, value=200.0, step=10.0
+    min_value=10.0, value=200.0, step=10.0
 )
 p_soc_inicial_percent = st.sidebar.slider(
     "SOC Inicial BESS (%)", 
@@ -619,8 +630,10 @@ p_gmg_fator_potencia_eficiente = st.sidebar.slider(
 
 # Converte o SOC inicial de % para fração
 p_soc_inicial_fracao = p_soc_inicial_percent / 100.0
-# Calcula a potência máxima eficiente do GMG
-p_gmg_potencia_max_por_unidade = p_gmg_potencia_unitaria * p_gmg_fator_potencia_eficiente
+
+# Garante que a capacidade não seja zero para evitar divisão por zero
+if p_bess_capacidade_kwh == 0:
+    p_bess_capacidade_kwh = 1e-6 # Valor muito pequeno, mas não zero
 
 
 # --- Executa Simulação de Curto Prazo ---
@@ -628,7 +641,7 @@ with st.spinner("Executando simulação de curto prazo..."):
     (
         vetor_tempo, vetor_carga, vetor_geracao_fv_original, vetor_geracao_fv_suavizada,
         vetor_gmg_potencia_despachada, vetor_potencia_bess, vetor_soc_kwh, vetor_gmgs_despachados,
-        potencia_pico_fv_curto, numero_de_passos
+        potencia_pico_fv_curto, numero_de_passos, vetor_fv_para_carga # <-- CORREÇÃO AQUI
     ) = run_short_term_simulation(
         p_dias_simulacao,
         p_potencia_pico_base_fv,
@@ -671,7 +684,7 @@ st.pyplot(fig2)
 
 st.header("Gráfico 3: Composição Média do Atendimento (2º Dia)")
 fig3 = plot_graph_3(
-    vetor_carga, vetor_fv_para_carga, vetor_gmg_potencia_despachada,
+    vetor_carga, vetor_fv_para_carga, vetor_gmg_potencia_despachada, # Agora 'vetor_fv_para_carga' está definido
     vetor_potencia_bess, numero_de_passos
 )
 if fig3:
