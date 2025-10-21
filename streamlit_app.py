@@ -205,9 +205,9 @@ def run_short_term_simulation(
             if bess_pode_ajudar:
                 bess_despacho_para_carga = min(carga_restante, bess_potencia_disponivel_descarga)
         else:
-            if geracao_fv_para_despacho >= (potencia_carga_atual * 0.80):
-                gmg_meta_para_carga = 0.20 * potencia_carga_atual
-                fv_despacho_para_carga = 0.80 * potencia_carga_atual
+            if geracao_fv_para_despacho >= (potencia_carga_atual * 0.90):
+                gmg_meta_para_carga = 0.10 * potencia_carga_atual
+                fv_despacho_para_carga = 0.90 * potencia_carga_atual
                 excesso_fv_real = geracao_fv_bruta - fv_despacho_para_carga
                 bess_carga_pelo_fv = max(0, excesso_fv_real)
             elif geracao_fv_para_despacho > 0 and soc_percentual_atual > 75:
@@ -349,9 +349,9 @@ def _simular_autonomia_interna(
                 bess_despacho_para_carga = 0
         else: # Período Diurno
             if geracao_fv_atual > 0:
-                if geracao_fv_atual >= (potencia_carga_atual * 0.80):
-                    gmg_meta_para_carga = 0.20 * potencia_carga_atual
-                    fv_despacho_para_carga = 0.80 * potencia_carga_atual
+                if geracao_fv_atual >= (potencia_carga_atual * 0.90):
+                    gmg_meta_para_carga = 0.10 * potencia_carga_atual
+                    fv_despacho_para_carga = 0.90 * potencia_carga_atual
                     bess_carga_pelo_fv = geracao_fv_atual - fv_despacho_para_carga
                 elif geracao_fv_atual > 0 and soc_percentual_atual > 75:
                     fv_despacho_para_carga = geracao_fv_atual
@@ -381,7 +381,7 @@ def _simular_autonomia_interna(
 
         # Atualização do BESS (Simplificado)
         limite_carga_por_passo_kwh = bess_capacidade_kwh * 0.13 * passo_de_tempo_h_longo
-        if bess_carga_pelo_fv > 0 and hora_do_dia < 15:
+        if bess_carga_pelo_fv > 0 and hora_do_dia < 17:
             potencia_carregamento_max_fv = min(bess_carga_pelo_fv, bess_potencia_max_kw)
             bess_soc_max_kwh = bess_capacidade_kwh * 0.90
             espaco_disponivel_kwh = max(0, bess_soc_max_kwh - bess_soc_kwh_longo)
