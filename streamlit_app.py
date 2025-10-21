@@ -474,15 +474,22 @@ def plot_graph_1(
     return figura1
 
 def plot_graph_2(resultados_autonomia):
-    # ... (código mantido, sem alterações)
+    """Gera o Gráfico 2: Curvas de Autonomia de Diesel"""
+    
     cores = ['green', 'orange', 'red', 'gray']
     figura2 = plt.figure(figsize=(18, 8))
 
+    # --- CORREÇÃO AQUI ---
+    # Usar o 'nome' do cenário diretamente, pois ele já contém o fator correto
     for (nome, resultado), cor in zip(resultados_autonomia.items(), cores):
         autonomia_valor = resultado['autonomia']
-        rotulo = f"{nome}"
+        # Usa o 'nome' completo (ex: 'Dias Normais (Fator 0.50)') como base do rótulo
+        rotulo = f"{nome}" 
         if autonomia_valor is not None:
+             # Adiciona apenas a informação da autonomia ao nome existente
              rotulo += f" (Autonomia: {autonomia_valor:.2f} Dias)"
+        # --- FIM DA CORREÇÃO ---
+             
         plt.plot(resultado['tempo'], resultado['nivel_diesel'], label=rotulo, color=cor, linewidth=2)
         if autonomia_valor is not None:
             plt.plot(autonomia_valor, 0, marker='o', color=cor, markersize=8)
