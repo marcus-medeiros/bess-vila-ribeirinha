@@ -26,7 +26,7 @@ EFICIENCIA_DESCARREGAMENTO = np.sqrt(BESS_EFICIENCIA_CICLO_COMPLETO)
 SOC_LIMITE_MAX = 90
 SOC_LIMITE_MIN_NORMAL = 40
 SOC_LIMITE_MIN_EMERGENCIA = 20
-SOC_RAMPA_INICIO = 82 # SOC (%) em que a potência de carga começa a ser reduzida
+SOC_RAMPA_INICIO = 85 # SOC (%) em que a potência de carga começa a ser reduzida
 
 # Aplicações (Constantes)
 ATIVAR_SUAVIZACAO_FV = True
@@ -147,7 +147,7 @@ def run_short_term_simulation(
         potencia_bess_suavizacao = 0
 
         # Lógica de Rampa de Carregamento
-        fator_rampa_carga = 0.8
+        fator_rampa_carga = 1.0 # Alterado de 0.8 para 1.0
         if soc_percentual_atual > SOC_RAMPA_INICIO:
             fator_rampa_carga = (SOC_LIMITE_MAX - soc_percentual_atual) / (SOC_LIMITE_MAX - SOC_RAMPA_INICIO)
             fator_rampa_carga = max(0, min(1, fator_rampa_carga))
@@ -279,10 +279,10 @@ def _simular_autonomia_interna(
     pontos_horarios_longa = np.arange(len(carga_horaria_longa))
     vetor_carga_longo = np.interp(vetor_tempo_h, pontos_horarios_longa, carga_horaria_longa)
 
-    # *** AQUI É ONDE A POTÊNCIA É CALCULADA ***
-    # Usa o fator_irradiacao_fv (que agora vem do slider e seus múltiplos)
     potencia_pico_fv = potencia_pico_base_fv * EFICIENCIA_FV * fator_irradiacao_fv
 
+    # Geração de perfil FV com o *mesmo* ruído da simulação de curto prazo
+    np.random.seed(42) # Para reprodutibilidade
     perfil_fv_24h_longo = np.zeros(24 * INTERVALOS_POR_HORA)
     for i, t in enumerate(np.linspace(0, 24, 24 * INTERVALOS_POR_HORA, endpoint=False)):
         hora_base = int(t)
@@ -291,9 +291,16 @@ def _simular_autonomia_interna(
             valor_final = FATOR_GERACAO_HORARIA[hora_base + 1]
             fracao = t - hora_base
             valor_interpolado = valor_inicial + (valor_final - valor_inicial) * fracao
-            perfil_fv_24h_longo[i] = valor_interpolado * potencia_pico_fv
+            ruido = np.random.normal(0, 0.08) # Adicionando o mesmo ruído
+            ruido = np.clip(ruido, -0.10, 0.10)
+            valor_com_osc = valor_interpolado * (1 + ruido)
+            perfil_fv_24h_longo[i] = max(0, valor_com_osc * potencia_pico_fv) # Usando potencia_pico_fv
         elif hora_base in FATOR_GERACAO_HORARIA:
-            perfil_fv_24h_longo[i] = FATOR_GERACAO_HORARIA[hora_base] * potencia_pico_fv
+            valor = FATOR_GERACAO_HORARIA[hora_base]
+            ruido = np.random.normal(0, 0.08)
+            ruido = np.clip(ruido, -0.10, 0.10)
+            valor_com_osc = valor * (1 + ruido)
+            perfil_fv_24h_longo[i] = max(0, valor_com_osc * potencia_pico_fv)
 
     vetor_geracao_fv_longo = np.tile(perfil_fv_24h_longo, dias_simulacao)
     vetor_geracao_fv_longo[vetor_geracao_fv_longo < 0] = 0
@@ -395,7 +402,7 @@ def _simular_autonomia_interna(
 @st.cache_data
 def run_long_term_simulation(
     potencia_pico_base_fv,
-    p_ceu_aberto_slider, # <-- ALTERAÇÃO 1: Recebe o valor do slider
+    p_ceu_aberto_slider, 
     bess_capacidade_kwh,
     bess_potencia_max_kw,
     numero_total_gmgs,
@@ -406,7 +413,6 @@ def run_long_term_simulation(
     """
     Executa a simulação de longo prazo (Gráfico 2) para vários cenários.
     """
-    # --- ALTERAÇÃO 2: Cenários agora são baseados no slider "p_ceu_aberto_slider" ---
     cenarios_autonomia = {
         f'Dias Normais (Fator {p_ceu_aberto_slider:.2f})': p_ceu_aberto_slider,
         f'Dias Nublados (Fator {p_ceu_aberto_slider * 0.5:.2f})': p_ceu_aberto_slider * 0.5,
@@ -420,7 +426,6 @@ def run_long_term_simulation(
     soc_inicial_longo_kwh = bess_capacidade_kwh * 0.90 # Inicia com SOC alto
 
     for nome, fator in cenarios_autonomia.items():
-        # 'fator' agora é o valor escalonado (ex: 0.8, 0.4, 0.16)
         vetor_tempo_dias_longo, vetor_nivel_diesel, dia_fim_autonomia = \
             _simular_autonomia_interna(
                 DIAS_SIMULACAO_LONGA, fator, soc_inicial_longo_kwh,
@@ -436,7 +441,169 @@ def run_long_term_simulation(
     return resultados_autonomia
 
 # ==============================================================================
-# 3. FUNÇÕES DE PLOTAGEM
+# 3. FUNÇÕES DE SIMULAÇÃO (GRÁFICO 4 - ANÁLISE ANUAL)
+# ==============================================================================
+
+def _simulate_one_day_diesel_consumption(
+    fator_irradiacao_fv, soc_inicial_kwh,
+    potencia_pico_base_fv, bess_capacidade_kwh, bess_potencia_max_kw,
+    numero_total_gmgs, gmg_potencia_max_por_unidade, gmg_potencia_unitaria, carga_limite_emergencia
+):
+    """
+    Simula 1 dia (24h) e retorna o consumo TOTAL de diesel para esse dia.
+    Usa a mesma lógica simplificada da simulação de autonomia.
+    """
+    
+    dias_simulacao = 1
+    numero_de_passos_dia = dias_simulacao * 24 * INTERVALOS_POR_HORA
+    passo_de_tempo_h_dia = 1.0 / INTERVALOS_POR_HORA
+    vetor_tempo_h = np.linspace(0, dias_simulacao * 24, numero_de_passos_dia, endpoint=False)
+
+    # Prepara Carga e FV
+    carga_horaria_longa = CARGA_HORARIA_24H * dias_simulacao
+    pontos_horarios_longa = np.arange(len(carga_horaria_longa))
+    vetor_carga_longo = np.interp(vetor_tempo_h, pontos_horarios_longa, carga_horaria_longa)
+
+    potencia_pico_fv = potencia_pico_base_fv * EFICIENCIA_FV * fator_irradiacao_fv
+
+    # Geração de perfil FV (sem ruído, para consistência da análise de sensibilidade)
+    perfil_fv_24h_longo = np.zeros(24 * INTERVALOS_POR_HORA)
+    for i, t in enumerate(np.linspace(0, 24, 24 * INTERVALOS_POR_HORA, endpoint=False)):
+        hora_base = int(t)
+        if hora_base in FATOR_GERACAO_HORARIA and (hora_base + 1) in FATOR_GERACAO_HORARIA:
+            valor_inicial = FATOR_GERACAO_HORARIA[hora_base]
+            valor_final = FATOR_GERACAO_HORARIA[hora_base + 1]
+            fracao = t - hora_base
+            valor_interpolado = valor_inicial + (valor_final - valor_inicial) * fracao
+            perfil_fv_24h_longo[i] = valor_interpolado * potencia_pico_fv
+        elif hora_base in FATOR_GERACAO_HORARIA:
+            perfil_fv_24h_longo[i] = FATOR_GERACAO_HORARIA[hora_base] * potencia_pico_fv
+
+    vetor_geracao_fv_longo = np.tile(perfil_fv_24h_longo, dias_simulacao)
+    vetor_geracao_fv_longo[vetor_geracao_fv_longo < 0] = 0
+
+    # Inicialização
+    bess_soc_kwh_longo = soc_inicial_kwh
+    total_diesel_consumido_litros = 0.0 # Rastreia o consumo
+
+    for i in range(numero_de_passos_dia):
+        soc_percentual_atual = (bess_soc_kwh_longo / bess_capacidade_kwh) * 100
+        potencia_carga_atual = vetor_carga_longo[i]
+        geracao_fv_atual = vetor_geracao_fv_longo[i]
+        hora_do_dia = vetor_tempo_h[i] % 24
+
+        gmg_despacho_para_carga = 0
+        bess_despacho_para_carga = 0
+        bess_carga_pelo_fv = 0
+        fv_despacho_para_carga = 0
+
+        bess_pode_ajudar = (soc_percentual_atual > SOC_LIMITE_MIN_NORMAL) or \
+                         (potencia_carga_atual > carga_limite_emergencia and soc_percentual_atual > SOC_LIMITE_MIN_EMERGENCIA)
+
+        if hora_do_dia < 6 or hora_do_dia >= 17 or geracao_fv_atual == 0:
+            gmg_meta_para_carga = 0
+            if bess_pode_ajudar:
+                if soc_percentual_atual > 75: gmg_meta_para_carga = 0.25 * potencia_carga_atual
+                elif soc_percentual_atual > 60: gmg_meta_para_carga = 0.4 * potencia_carga_atual
+                elif soc_percentual_atual > 50: gmg_meta_para_carga = 0.5 * potencia_carga_atual
+                else: gmg_meta_para_carga = 0.6 * potencia_carga_atual
+            else: gmg_meta_para_carga = potencia_carga_atual
+            
+            potencia_unitaria_a_usar = gmg_potencia_max_por_unidade
+            capacidade_eficiente_total = numero_total_gmgs * gmg_potencia_max_por_unidade
+            if not bess_pode_ajudar and gmg_meta_para_carga > capacidade_eficiente_total:
+                potencia_unitaria_a_usar = gmg_potencia_unitaria 
+            
+            gmgs_necessarios = np.ceil(gmg_meta_para_carga / potencia_unitaria_a_usar) if potencia_unitaria_a_usar > 0 else float('inf')
+            gmg_despacho_para_carga = min(gmg_meta_para_carga, min(numero_total_gmgs, gmgs_necessarios) * potencia_unitaria_a_usar)
+            carga_restante = potencia_carga_atual - gmg_despacho_para_carga
+            if bess_pode_ajudar:
+                bess_despacho_para_carga = min(carga_restante, bess_potencia_max_kw)
+            else:
+                bess_despacho_para_carga = 0
+        else: # Período Diurno
+            if geracao_fv_atual > 0:
+                if geracao_fv_atual >= (potencia_carga_atual * 0.75):
+                    gmg_meta_para_carga = 0.25 * potencia_carga_atual
+                    fv_despacho_para_carga = 0.75 * potencia_carga_atual
+                    bess_carga_pelo_fv = geracao_fv_atual - fv_despacho_para_carga
+                elif geracao_fv_atual > 0 and soc_percentual_atual > 75:
+                    fv_despacho_para_carga = geracao_fv_atual
+                    deficit = potencia_carga_atual - fv_despacho_para_carga
+                    bess_despacho_para_carga = 0.75 * deficit
+                    gmg_meta_para_carga = 0.25 * deficit
+                else:
+                    fv_despacho_para_carga = geracao_fv_atual
+                    gmg_meta_para_carga = potencia_carga_atual - fv_despacho_para_carga
+                    bess_despacho_para_carga = 0
+            gmgs_necessarios = np.ceil(gmg_meta_para_carga / gmg_potencia_max_por_unidade) if gmg_potencia_max_por_unidade > 0 else float('inf')
+            gmg_despacho_para_carga = min(gmg_meta_para_carga, min(numero_total_gmgs, gmgs_necessarios) * gmg_potencia_max_por_unidade)
+            deficit_final = potencia_carga_atual - fv_despacho_para_carga - gmg_despacho_para_carga
+            bess_despacho_para_carga = max(bess_despacho_para_carga, deficit_final)
+        
+        # Rastreamento de Diesel
+        consumo_diesel_lh = calcular_consumo_diesel(gmg_despacho_para_carga)
+        gasto_passo_l = consumo_diesel_lh * passo_de_tempo_h_dia
+        total_diesel_consumido_litros += gasto_passo_l # Acumula o consumo
+
+        # Atualização do BESS (Simplificado)
+        limite_carga_por_passo_kwh = bess_capacidade_kwh * 0.13 * passo_de_tempo_h_dia
+        if bess_carga_pelo_fv > 0 and hora_do_dia < 15:
+            potencia_carregamento_max_fv = min(bess_carga_pelo_fv, bess_potencia_max_kw)
+            bess_soc_max_kwh = bess_capacidade_kwh * 0.90
+            espaco_disponivel_kwh = max(0, bess_soc_max_kwh - bess_soc_kwh_longo)
+            energia_por_potencia = (potencia_carregamento_max_fv * passo_de_tempo_h_dia) * EFICIENCIA_CARREGAMENTO
+            energia_por_taxa = limite_carga_por_passo_kwh
+            energia_final_adicionada = min(energia_por_potencia, espaco_disponivel_kwh, energia_por_taxa)
+            if energia_final_adicionada > 0:
+                bess_soc_kwh_longo += energia_final_adicionada
+        elif bess_despacho_para_carga > 0 and soc_percentual_atual > 20:
+            potencia_descarga_necessaria = min(bess_despacho_para_carga, bess_potencia_max_kw)
+            energia_bruta_drenar = (potencia_descarga_necessaria * passo_de_tempo_h_dia) / EFICIENCIA_DESCARREGAMENTO
+            energia_final_drenada = min(energia_bruta_drenar, bess_soc_kwh_longo)
+            if energia_final_drenada > 0:
+                bess_soc_kwh_longo -= energia_final_drenada
+                
+    return total_diesel_consumido_litros
+
+@st.cache_data
+def calculate_annual_diesel_consumption(
+    potencia_pico_base_fv, bess_capacidade_kwh, bess_potencia_max_kw,
+    numero_total_gmgs, gmg_potencia_unitaria, gmg_fator_potencia_eficiente, carga_limite_emergencia
+):
+    """
+    Calcula o consumo anual ponderado de diesel com base nos pesos fornecidos.
+    """
+    gmg_potencia_max_por_unidade = gmg_potencia_unitaria * gmg_fator_potencia_eficiente
+    # Começa cada dia de simulação com 50% SOC para um caso médio
+    soc_inicial_kwh = bess_capacidade_kwh * 0.5 
+
+    # Ponderação de dias no ano
+    # 40% ceu_aberto=1.0, 30% ceu_aberto=0.5, 10% ceu_aberto=0.2, 20% ceu_aberto=0.0
+    factors_and_weights = {
+        1.0: 0.40,
+        0.5: 0.30,
+        0.2: 0.10,
+        0.0: 0.20  # Assumindo 20% de dias sem sol para completar 100%
+    }
+    
+    total_diesel_ponderado_diario = 0.0
+    
+    common_args = (
+        potencia_pico_base_fv, bess_capacidade_kwh, bess_potencia_max_kw,
+        numero_total_gmgs, gmg_potencia_max_por_unidade, gmg_potencia_unitaria, carga_limite_emergencia
+    )
+
+    for factor, weight in factors_and_weights.items():
+        daily_diesel = _simulate_one_day_diesel_consumption(
+            factor, soc_inicial_kwh, *common_args
+        )
+        total_diesel_ponderado_diario += daily_diesel * weight
+        
+    return total_diesel_ponderado_diario * 365
+
+# ==============================================================================
+# 4. FUNÇÕES DE PLOTAGEM
 # ==============================================================================
 
 def plot_graph_1(
@@ -453,7 +620,7 @@ def plot_graph_1(
     eixos1[0].plot(vetor_tempo, vetor_geracao_fv_original, label='Geração FV Original (kW)', color='gold', alpha=0.9, linestyle=':', zorder=4)
     eixos1[0].fill_between(vetor_tempo, vetor_geracao_fv_suavizada, label='Geração FV Suavizada (Meta)', color='darkorange', linewidth=2.5, alpha= 0.3, zorder=5)
     eixos1[0].fill_between(vetor_tempo, vetor_gmg_potencia_despachada, color='gray', alpha=0.6, zorder=2, label='Potência GMG Despachada (kW)')
-    eixos1[0].fill_between(vetor_tempo, 0, -vetor_potencia_bess, where=(vetor_potencia_bess >= 0), hatch='//', edgecolor='green', facecolor='lightgreen', alpha=0.7, label='BESS Recarregando (kW)', zorder=3)
+    eixos1[0].fill_between(vetor_tempo, 0, -vetor_potencia_bess, where=(vetor_potencia_bess >= 0), hatch='//', edgecolor='green', facecolor='lightgreen', alpha=0.7, label='BESS Carregando (kW)', zorder=3)
     eixos1[0].fill_between(vetor_tempo, 0, -vetor_potencia_bess, where=(vetor_potencia_bess < 0), hatch='\\', edgecolor='red', facecolor='lightcoral', alpha=0.7, label='BESS Descarregando (kW)', zorder=3)
     eixos1[0].set_ylabel('Potência (kW)', fontsize=12)
     eixos1[0].set_title(f'Simulação com Suavização FV | BESS: {bess_capacidade_kwh} kWh | PV: {potencia_pico_fv_curto:.2f} kWp ({dias_simulacao*24} Horas)', fontsize=16)
@@ -521,7 +688,7 @@ def plot_graph_3(
     
     indice_inicio_dia2 = 24 * INTERVALOS_POR_HORA
     if numero_de_passos > indice_inicio_dia2:
-        # Garante que peguemos apenas os dados do dia 2 em diante, até o fim
+        # Garante que peguemos apenas os dados do dia 2
         slice_dia2 = slice(indice_inicio_dia2, (indice_inicio_dia2 + 24 * INTERVALOS_POR_HORA))
         
         carga_dia2 = vetor_carga[slice_dia2]
@@ -529,7 +696,6 @@ def plot_graph_3(
         gmg_dia2 = vetor_gmg_potencia_despachada[slice_dia2]
         potencia_bess_total_dia2 = vetor_potencia_bess[slice_dia2]
         
-        # Se os dados do dia 2 estiverem incompletos (ex: simulação de 2.5 dias), preenchemos
         expected_len = 24 * INTERVALOS_POR_HORA
         if len(carga_dia2) < expected_len:
             carga_dia2 = np.pad(carga_dia2, (0, expected_len - len(carga_dia2)), 'constant')
@@ -551,6 +717,9 @@ def plot_graph_3(
         eixos3.bar(horas_dia, gmg_horaria, label='GMG', color='gray', alpha=0.8)
         eixos3.bar(horas_dia, fv_carga_horaria, bottom=gmg_horaria, label='FV para Carga', color='orange', alpha=0.8)
         eixos3.bar(horas_dia, bess_descarga_horaria, bottom=gmg_horaria + fv_carga_horaria, label='BESS (descarga)', color='crimson', alpha=0.8)
+        
+        # Linha da carga total para referência
+        eixos3.plot(horas_dia, carga_horaria, label='Carga Total Média', color='blue', linestyle='--', marker='o')
 
         eixos3.set_xlabel('Horas', fontsize=12)
         eixos3.set_ylabel('Potência Média (kW)', fontsize=12)
@@ -565,8 +734,67 @@ def plot_graph_3(
     else:
         return None
 
+def plot_graph_4(
+    p_numero_total_gmgs, p_gmg_potencia_unitaria, p_gmg_fator_potencia_eficiente, p_carga_limite_emergencia
+):
+    """
+    Gera o Gráfico 4: Análise de Sensibilidade do Consumo Anual de Diesel
+    Eixo X: Capacidade BESS (kWh)
+    Eixo Y: Consumo Anual de Diesel (L)
+    Linhas: Diferentes tamanhos de Potência FV (kWp)
+    """
+    st.header("Gráfico 4: Análise de Sensibilidade (Consumo Anual de Diesel)")
+    
+    with st.spinner("Executando análise de sensibilidade (Gráfico 4)... Isso pode levar um momento."):
+        fig, ax = plt.subplots(figsize=(14, 8))
+
+        # Eixo X: 0 a 1000 kWh em 11 passos (0, 100, 200...)
+        bess_range_kwh = np.linspace(0, 1000, 11)
+        # Linhas: 0 a 1000 kWp em 5 passos (0, 250, 500, 750, 1000)
+        fv_range_kwp = np.linspace(0, 1000, 5)
+
+        total_sims = len(bess_range_kwh) * len(fv_range_kwp)
+        progress_bar = st.progress(0.0)
+        sim_count = 0
+
+        for fv_kwp in fv_range_kwp:
+            diesel_results = []
+            st.write(f"Simulando para FV = {fv_kwp:.0f} kWp...") # Fornece feedback
+            for bess_kwh in bess_range_kwh:
+                # Assume 0.5C C-rate: Potência (kW) = 0.5 * Capacidade (kWh)
+                bess_kw = bess_kwh * 0.5 
+                
+                # Prevenção de divisão por zero
+                if bess_kwh == 0: 
+                    bess_kw = 0
+                    bess_kwh = 1e-6 # Valor muito pequeno, mas não zero
+                
+                # Chama a função cacheada
+                diesel = calculate_annual_diesel_consumption(
+                    fv_kwp, bess_kwh, bess_kw,
+                    p_numero_total_gmgs, p_gmg_potencia_unitaria, 
+                    p_gmg_fator_potencia_eficiente, p_carga_limite_emergencia
+                )
+                diesel_results.append(diesel)
+                
+                sim_count += 1
+                progress_bar.progress(sim_count / total_sims)
+
+            ax.plot(bess_range_kwh, diesel_results, label=f'FV {fv_kwp:.0f} kWp', marker='o', markersize=5)
+
+        progress_bar.empty() # Remove a barra de progresso
+
+        ax.set_xlabel('Capacidade BESS (kWh)')
+        ax.set_ylabel('Consumo Anual de Diesel (L)')
+        ax.set_title('Consumo de Diesel vs. Dimensionamento BESS (para vários tamanhos de FV)')
+        ax.legend()
+        ax.grid(True, linestyle='--', alpha=0.7)
+        plt.tight_layout()
+        st.pyplot(fig)
+
+
 # ==============================================================================
-# 4. INTERFACE DO USUÁRIO (STREAMLIT SIDEBAR)
+# 5. INTERFACE DO USUÁRIO (STREAMLIT SIDEBAR)
 # ==============================================================================
 
 st.sidebar.header("Parâmetros de Simulação")
@@ -598,7 +826,7 @@ p_ceu_aberto = st.sidebar.slider(
 st.sidebar.subheader("Bateria (BESS)")
 p_bess_capacidade_kwh = st.sidebar.number_input(
     "Capacidade BESS (kWh)", 
-    min_value=10.0, value=750.0, step=50.0 # Alterado min_value para 10.0 para evitar divisão por zero
+    min_value=10.0, value=750.0, step=50.0 
 )
 p_bess_potencia_max_kw = st.sidebar.number_input(
     "Potência BESS (kW)", 
@@ -627,7 +855,7 @@ p_gmg_fator_potencia_eficiente = st.sidebar.slider(
 
 
 # ==============================================================================
-# 5. EXECUÇÃO PRINCIPAL E PLOTAGEM
+# 6. EXECUÇÃO PRINCIPAL E PLOTAGEM
 # ==============================================================================
 
 # Converte o SOC inicial de % para fração
@@ -659,10 +887,9 @@ with st.spinner("Executando simulação de curto prazo..."):
 
 # --- Executa Simulação de Longo Prazo ---
 with st.spinner("Executando simulação de autonomia de longo prazo..."):
-    # --- ALTERAÇÃO 3: Passa o valor do slider 'p_ceu_aberto' para a função ---
     resultados_autonomia = run_long_term_simulation(
         p_potencia_pico_base_fv,
-        p_ceu_aberto, # <-- Passa o valor do slider aqui
+        p_ceu_aberto, 
         p_bess_capacidade_kwh,
         p_bess_potencia_max_kw,
         p_numero_total_gmgs,
@@ -695,3 +922,13 @@ if fig3:
     st.pyplot(fig3)
 else:
     st.warning("Simulação muito curta para gerar o gráfico do 2º dia. (Requer pelo menos 2 dias de simulação)")
+
+# --- PLOTAGEM DO GRÁFICO 4 ---
+# Nota: Os parâmetros de GMG e Carga Limite são pegos dos sliders da sidebar.
+# O dimensionamento de FV e BESS é variado internamente pela função.
+plot_graph_4(
+    p_numero_total_gmgs, 
+    p_gmg_potencia_unitaria, 
+    p_gmg_fator_potencia_eficiente, 
+    p_carga_limite_emergencia
+)
