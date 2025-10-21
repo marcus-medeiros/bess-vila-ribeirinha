@@ -354,8 +354,13 @@ def run_long_term_simulation(
     gmg_fator_potencia_eficiente, carga_limite_emergencia
 ):
     """
-    Executa a simulação de longo prazo para autonomia, chamando a simulação detalhada dia a dia.
+    Executa a simulação de longo prazo para autonomia, chamando a simulação detalhada dia a dia,
+    COM ESTADO DE CARGA (SOC) CONTÍNUO.
     """
+    
+    # Garante que não haja divisão por zero
+    bess_capacidade_kwh_safe = max(bess_capacidade_kwh, 1e-6)
+    
     cenarios_autonomia = {
         f'Dias Normais (Fator {p_ceu_aberto_slider:.2f})': p_ceu_aberto_slider,
         f'Dias Nublados (Fator {p_ceu_aberto_slider * 0.5:.2f})': p_ceu_aberto_slider * 0.5,
@@ -369,25 +374,59 @@ def run_long_term_simulation(
         vetor_nivel_diesel = [tanque_diesel_litros]
         dia_fim_autonomia = None
         
+        # =================================================================
+        # --- LÓGICA CORRIGIDA: SOC CONTÍNUO ---
+        # =================================================================
+        # Começa a simulação de 120 dias com 50% de SOC
+        soc_atual_kwh = bess_capacidade_kwh_safe * 0.5 
+        # =================================================================
+
         for dia in range(1, DIAS_SIMULACAO_LONGA + 1):
             if tanque_diesel_litros <= 0.1:
                 if dia_fim_autonomia is None:
-                    dia_fim_autonomia = dia - 1 + (vetor_nivel_diesel[-2] / (vetor_nivel_diesel[-2] - vetor_nivel_diesel[-1]) if len(vetor_nivel_diesel) > 1 else 0)
+                    # Cálculo de interpolação para o dia exato em que acaba
+                    dia_fim_autonomia = dia - 1 + (vetor_nivel_diesel[-2] / (vetor_nivel_diesel[-2] - vetor_nivel_diesel[-1]) if (len(vetor_nivel_diesel) > 1 and (vetor_nivel_diesel[-2] - vetor_nivel_diesel[-1]) > 1e-6) else 0)
                 vetor_nivel_diesel.append(0)
                 continue
 
-            # Simula um dia com a lógica detalhada (sem ruído para consistência diária)
+            # =================================================================
+            # --- LÓGICA CORRIGIDA: SOC CONTÍNUO ---
+            # =================================================================
+            # Calcula o SOC inicial para este dia como uma fração
+            soc_inicial_fracao_dia = soc_atual_kwh / bess_capacidade_kwh_safe
+            # =================================================================
+
+            # Simula um dia com a lógica detalhada
             resultado_dia = _run_simulation_detailed(
-                dias_simulacao=1, potencia_pico_fv_base=potencia_pico_base_fv, fator_irradiacao=fator,
-                bess_capacidade_kwh=bess_capacidade_kwh, bess_potencia_max_kw=bess_potencia_max_kw,
-                soc_inicial_fracao=0.5, # Começa cada dia com SOC médio
-                numero_total_gmgs=numero_total_gmgs, gmg_potencia_unitaria=gmg_potencia_unitaria,
+                dias_simulacao=1, 
+                potencia_pico_fv_base=potencia_pico_base_fv, 
+                fator_irradiacao=fator,
+                bess_capacidade_kwh=bess_capacidade_kwh_safe, 
+                bess_potencia_max_kw=bess_potencia_max_kw,
+                # Passa o SOC inicial correto para o dia
+                soc_inicial_fracao=soc_inicial_fracao_dia, 
+                numero_total_gmgs=numero_total_gmgs, 
+                gmg_potencia_unitaria=gmg_potencia_unitaria,
                 gmg_fator_potencia_eficiente=gmg_fator_potencia_eficiente,
-                carga_limite_emergencia=carga_limite_emergencia, use_noise=True # Use ruído para ser consistente com Gráfico 1
+                carga_limite_emergencia=carga_limite_emergencia, 
+                use_noise=True
             )
             
             tanque_diesel_litros -= resultado_dia["total_diesel_consumido"]
             vetor_nivel_diesel.append(max(0, tanque_diesel_litros))
+
+            # =================================================================
+            # --- LÓGICA CORRIGIDA: SOC CONTÍNUO ---
+            # =================================================================
+            # Atualiza o SOC para o início do próximo dia
+            # Pega o último valor de SOC (em kWh) do dia que acabou de ser simulado
+            if len(resultado_dia["vetor_soc_kwh"]) > 0:
+                soc_atual_kwh = resultado_dia["vetor_soc_kwh"][-1]
+            else:
+                # Fallback, embora não deva acontecer
+                soc_atual_kwh = soc_inicial_fracao_dia * bess_capacidade_kwh_safe
+            # =================================================================
+
 
         resultados_autonomia[nome] = {
             'tempo': np.arange(0, DIAS_SIMULACAO_LONGA + 1),
