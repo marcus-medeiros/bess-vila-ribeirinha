@@ -447,9 +447,9 @@ def calculate_annual_diesel_consumption(
 
     factors_and_weights = {
         1.0: 0.40, # 40% Céu Aberto
-        0.5: 0.30, # 30% Nublado
+        0.5: 0.35, # 35% Nublado
         0.2: 0.20, # 20% Tempestade
-        0.0: 0.10  # 10% Sem Sol
+        0.0: 0.05  # 5% Sem Sol
     }
     
     total_diesel_ponderado_diario = 0.0
@@ -630,9 +630,9 @@ def plot_graph_4(
         * Sem Sol (Fator 0.0)
     4.  **Média Anual Ponderada:** Assumimos uma distribuição anual desses dias:
         * 40% Céu Aberto
-        * 30% Nublado
+        * 35% Nublado
         * 20% Tempestade
-        * 10% Sem Sol
+        * 5% Sem Sol
         Calculamos a média diária de consumo de diesel usando esses pesos.
     5.  **Consumo Anual:** Multiplicamos a média diária ponderada por 365 para estimar o consumo anual total de diesel em Litros.
     """)
@@ -651,7 +651,7 @@ def plot_graph_4(
             for fv_kwp in fv_range_kwp:
                 diesel_results = []
                 for bess_kwh in bess_range_kwh:
-                    bess_kw = bess_kwh * 0.2 
+                    bess_kw = bess_kwh * 0.5 
                     bess_kwh_safe = max(bess_kwh, 1e-6) 
                     bess_kw_safe = max(bess_kw, 1e-6)
 
