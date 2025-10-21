@@ -305,7 +305,10 @@ def _run_simulation_detailed(
             energia_final_drenada = min(energia_bruta_drenar, max(0, bess_soc_kwh - (bess_capacidade_kwh * SOC_LIMITE_MIN_EMERGENCIA / 100)))
             if energia_final_drenada > 0:
                 bess_soc_kwh -= energia_final_drenada
-                potencia_entregue_rede = (energia_final_drenada * EFICIENCIA_DESCARREGamento) / passo_de_tempo_h
+                
+                # --- CORREÇÃO APLICADA AQUI ---
+                potencia_entregue_rede = (energia_final_drenada * EFICIENCIA_DESCARREGAMENTO) / passo_de_tempo_h
+                
                 potencia_descarga_bess_carga = -potencia_entregue_rede
                 potencia_total_bess += potencia_descarga_bess_carga
                 
