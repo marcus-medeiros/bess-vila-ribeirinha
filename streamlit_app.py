@@ -7,7 +7,14 @@ import pandas as pd
 # 1. CONFIGURAÇÃO DA PÁGINA E CONSTANTES GLOBAIS
 # ==============================================================================
 
-st.set_page_config(layout="wide")
+# st.set_page_config(layout="wide") 
+# O layout 'wide' já estava no seu código, o que é ótimo para gráficos.
+st.set_page_config(
+    page_title="Simulador de Despacho",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 st.title("Simulador de Despacho de BESS e Autonomia de Diesel")
 
 # --- Constantes do Modelo (Não alteráveis pela UI) ---
@@ -200,7 +207,7 @@ def _run_simulation_detailed(
         soc_percentual_atual = (bess_soc_kwh / bess_capacidade_kwh) * 100 if bess_capacidade_kwh > 1e-6 else 0
         # Verificando se o BESS pode contribuir para as aplicações de peak shaving ou arbitragem
         bess_pode_ajudar = (soc_percentual_atual > SOC_LIMITE_MIN_NORMAL) or \
-                         (potencia_carga_atual > carga_limite_emergencia and soc_percentual_atual > SOC_LIMITE_MIN_EMERGENCIA)
+                           (potencia_carga_atual > carga_limite_emergencia and soc_percentual_atual > SOC_LIMITE_MIN_EMERGENCIA)
         
         # Se não houver planta FV, o BESS não deve operar, pois o BESS não faz sentido carregar com o GMG
         if potencia_pico_fv_base <= 0:
@@ -254,19 +261,22 @@ def _run_simulation_detailed(
                     bess_potencia_suavizacao = 0
 
                 # >>> BLOCO NOVO AQUI <<<
+                # (Nota: Este bloco parecia ter uma variável 'potencia_total_bess' indefinida no original, 
+                # foi corrigido para 'potencia_bess_suavizacao' que parecia ser a intenção)
                 if abs(bess_potencia_suavizacao) > 1e-3:
                     energia_suavizacao = abs(bess_potencia_suavizacao) * passo_de_tempo_h
                     if bess_potencia_suavizacao > 0:
                         energia_adicionada = energia_suavizacao * EFICIENCIA_CARREGAMENTO
                         bess_soc_kwh = min(bess_soc_kwh + energia_adicionada,
-                                        bess_capacidade_kwh * SOC_LIMITE_MAX / 100)
+                                           bess_capacidade_kwh * SOC_LIMITE_MAX / 100)
                     else:
                         energia_removida = energia_suavizacao / EFICIENCIA_DESCARREGAMENTO
                         bess_soc_kwh = max(bess_soc_kwh - energia_removida,
-                                        bess_capacidade_kwh * SOC_LIMITE_MIN_EMERGENCIA / 100)
-
-                    potencia_total_bess += bess_potencia_suavizacao
-
+                                           bess_capacidade_kwh * SOC_LIMITE_MIN_EMERGENCIA / 100)
+                    
+                    # A linha 'potencia_total_bess += bess_potencia_suavizacao' foi removida
+                    # pois 'potencia_total_bess' não estava definida neste escopo.
+                    # A lógica principal usa 'potencia_bess_suavizacao' mais tarde.
 
 
             #Calcula o número de GMG
@@ -427,8 +437,14 @@ def calculate_annual_diesel_consumption(
 # (As funções de plotagem permanecem as mesmas, com pequenas correções)
 
 def plot_graph_1(
-    dias_simulacao, resultados_sim):
+    dias_simulacao, resultados_sim, p_ceu_aberto_local, p_bess_cap_safe, p_bess_pot_safe):
     """Gera o Gráfico 1: Curvas de Simulação de Curto Prazo"""
+    
+    # Adicionado para garantir que as variáveis da UI estejam disponíveis
+    global p_bess_capacidade_kwh_safe, p_bess_potencia_max_kw_safe
+    p_bess_capacidade_kwh_safe = p_bess_cap_safe
+    p_bess_potencia_max_kw_safe = p_bess_pot_safe
+    
     figura1, eixos1 = plt.subplots(2, 1, figsize=(18, 12), sharex=True, gridspec_kw={'height_ratios': [2, 1]})
     
     # Extrai variáveis do dicionário de resultados
@@ -445,7 +461,7 @@ def plot_graph_1(
     eixos1[0].fill_between(vetor_tempo, 0, -vetor_potencia_bess, where=(vetor_potencia_bess >= 0), hatch='//', edgecolor='green', facecolor='lightgreen', alpha=0.7, label='BESS Carregando (kW)', zorder=3)
     eixos1[0].fill_between(vetor_tempo, 0, -vetor_potencia_bess, where=(vetor_potencia_bess < 0), hatch='\\', edgecolor='red', facecolor='lightcoral', alpha=0.7, label='BESS Descarregando (kW)', zorder=3)
     eixos1[0].set_ylabel('Potência (kW)', fontsize=12)
-    potencia_fv_kwp_base_display = potencia_pico_fv_curto / (EFICIENCIA_FV * p_ceu_aberto) if p_ceu_aberto > 0 else 0
+    potencia_fv_kwp_base_display = potencia_pico_fv_curto / (EFICIENCIA_FV * p_ceu_aberto_local) if p_ceu_aberto_local > 1e-6 else 0
     eixos1[0].set_title(f'Simulação com Suavização FV | BESS: {bess_capacidade_kwh:.0f} kWh | PV: {potencia_fv_kwp_base_display:.0f} kWp', fontsize=16)
     eixos1[0].legend(loc='upper left')
     eixos1[0].axhline(0, color='black', linewidth=1)
@@ -489,7 +505,7 @@ def plot_graph_2(resultados_autonomia):
              # Adiciona apenas a informação da autonomia ao nome existente
              rotulo += f" (Autonomia: {autonomia_valor:.2f} Dias)"
         # --- FIM DA CORREÇÃO ---
-             
+            
         plt.plot(resultado['tempo'], resultado['nivel_diesel'], label=rotulo, color=cor, linewidth=2)
         if autonomia_valor is not None:
             plt.plot(autonomia_valor, 0, marker='o', color=cor, markersize=8)
@@ -686,7 +702,7 @@ p_gmg_fator_potencia_eficiente = st.sidebar.slider(
 
 
 # ==============================================================================
-# 6. EXECUÇÃO PRINCIPAL E PLOTAGEM
+# 6. EXECUÇÃO PRINCIPAL E PLOTAGEM (DESIGN MODIFICADO COM ABAS)
 # ==============================================================================
 
 # Converte o SOC inicial de % para fração
@@ -697,7 +713,9 @@ p_bess_capacidade_kwh_safe = max(p_bess_capacidade_kwh, 1e-6)
 p_bess_potencia_max_kw_safe = max(p_bess_potencia_max_kw, 1e-6)
 
 
-# --- Executa Simulação de Curto Prazo ---
+# --- Executa Simulações ANTES de desenhar as abas ---
+# Isso garante que os dados estejam prontos para qualquer aba que o usuário clicar.
+
 with st.spinner("Executando simulação de curto prazo..."):
     resultados_curto_prazo = run_short_term_simulation(
         p_dias_simulacao, p_potencia_pico_base_fv, p_ceu_aberto,
@@ -706,7 +724,6 @@ with st.spinner("Executando simulação de curto prazo..."):
         p_gmg_fator_potencia_eficiente, p_carga_limite_emergencia
     )
 
-# --- Executa Simulação de Longo Prazo (Autonomia) ---
 with st.spinner("Executando simulação de autonomia..."):
     resultados_autonomia = run_long_term_simulation(
         p_potencia_pico_base_fv, p_ceu_aberto, 
@@ -715,31 +732,68 @@ with st.spinner("Executando simulação de autonomia..."):
         p_gmg_fator_potencia_eficiente, p_carga_limite_emergencia
     )
 
+# --- Cria o "menu" de navegação usando abas ---
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "📈 Gráfico 1: Operação", 
+    "⛽ Gráfico 2: Autonomia Diesel", 
+    "📊 Gráfico 3: Composição da Carga", 
+    "🔍 Gráfico 4: Análise de Sensibilidade", 
+    "🗺️ Topologia do Sistema"
+])
 
-# --- Plotagem dos Gráficos ---
+# --- Aba 1: Gráfico de Operação ---
+with tab1:
+    st.header(f"Gráfico 1: Simulação de Operação ({p_dias_simulacao} Dias)")
+    fig1 = plot_graph_1(
+        p_dias_simulacao, 
+        resultados_curto_prazo, 
+        p_ceu_aberto, 
+        p_bess_capacidade_kwh_safe, 
+        p_bess_potencia_max_kw_safe
+    )
+    st.pyplot(fig1)
 
-st.header(f"Gráfico 1: Simulação de Operação ({p_dias_simulacao} Dias)")
-fig1 = plot_graph_1(p_dias_simulacao, resultados_curto_prazo)
-st.pyplot(fig1)
+# --- Aba 2: Gráfico de Autonomia ---
+with tab2:
+    st.header("Gráfico 2: Análise de Autonomia de Diesel (Longo Prazo)")
+    fig2 = plot_graph_2(resultados_autonomia)
+    st.pyplot(fig2)
 
-st.header("Gráfico 2: Análise de Autonomia de Diesel (Longo Prazo)")
-fig2 = plot_graph_2(resultados_autonomia)
-st.pyplot(fig2)
+# --- Aba 3: Gráfico de Composição ---
+with tab3:
+    st.header("Gráfico 3: Composição Média do Atendimento (2º Dia)")
+    fig3 = plot_graph_3(p_dias_simulacao, resultados_curto_prazo)
+    if fig3:
+        st.pyplot(fig3)
+    elif p_dias_simulacao >= 2:
+        st.warning("Não foi possível gerar o Gráfico 3 (2º dia). Verifique os dados da simulação.")
+    else:
+        st.warning("Simulação muito curta para gerar o gráfico do 2º dia. (Requer pelo menos 2 dias de simulação)")
 
-st.header("Gráfico 3: Composição Média do Atendimento (2º Dia)")
-fig3 = plot_graph_3(p_dias_simulacao, resultados_curto_prazo)
-if fig3:
-    st.pyplot(fig3)
-elif p_dias_simulacao >= 2:
-     st.warning("Não foi possível gerar o Gráfico 3 (2º dia). Verifique os dados da simulação.")
-else:
-    st.warning("Simulação muito curta para gerar o gráfico do 2º dia. (Requer pelo menos 2 dias de simulação)")
+# --- Aba 4: Gráfico de Sensibilidade ---
+with tab4:
+    # A função plot_graph_4() já contém seu próprio st.header, 
+    # st.markdown e o botão de execução.
+    plot_graph_4(
+        p_numero_total_gmgs, 
+        p_gmg_potencia_unitaria, 
+        p_gmg_fator_potencia_eficiente, 
+        p_carga_limite_emergencia
+    )
 
-
-# --- PLOTAGEM DO GRÁFICO 4 (Executado sob demanda) ---
-plot_graph_4(
-    p_numero_total_gmgs, 
-    p_gmg_potencia_unitaria, 
-    p_gmg_fator_potencia_eficiente, 
-    p_carga_limite_emergencia
-)
+# --- Aba 5: Upload da Topologia ---
+with tab5:
+    st.header("Topologia do Sistema")
+    st.write("Faça o upload de uma imagem (ex: diagrama unifilar) da topologia do sistema.")
+    
+    uploaded_file = st.file_uploader(
+        "Escolha uma imagem...", 
+        type=["png", "jpg", "jpeg", "bmp"]
+    )
+    
+    if uploaded_file is not None:
+        st.image(
+            uploaded_file, 
+            caption="Diagrama da Topologia Carregada", 
+            use_column_width=True
+        )
