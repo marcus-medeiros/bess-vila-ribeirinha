@@ -642,7 +642,7 @@ def plot_graph_4(
             fig, ax = plt.subplots(figsize=(14, 8))
 
             bess_range_kwh = np.linspace(250, 1250, 11) 
-            fv_range_kwp = np.linspace(250, 1250, 5)   
+            fv_range_kwp = np.linspace(250, 1250, 11)   
 
             total_sims = len(bess_range_kwh) * len(fv_range_kwp)
             progress_bar = st.progress(0.0)
