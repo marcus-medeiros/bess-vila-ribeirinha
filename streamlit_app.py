@@ -623,7 +623,7 @@ def plot_graph_1(
     eixos1[0].fill_between(vetor_tempo, 0, -vetor_potencia_bess, where=(vetor_potencia_bess >= 0), hatch='//', edgecolor='green', facecolor='lightgreen', alpha=0.7, label='BESS Carregando (kW)', zorder=3)
     eixos1[0].fill_between(vetor_tempo, 0, -vetor_potencia_bess, where=(vetor_potencia_bess < 0), hatch='\\', edgecolor='red', facecolor='lightcoral', alpha=0.7, label='BESS Descarregando (kW)', zorder=3)
     eixos1[0].set_ylabel('Potência (kW)', fontsize=12)
-    eixos1[0].set_title(f'Simulação com Suavização FV | BESS: {bess_capacidade_kwh} kWh | PV: {potencia_pico_fv_curto:.2f} kWp ({dias_simulacao*24} Horas)', fontsize=16)
+    eixos1[0].set_title(f'Simulação com Suavização FV | BESS: {bess_capacidade_kwh} kWh | PV: {(potencia_pico_fv_curto/EFICIENCIA_FV):.2f} kWp', fontsize=16)
     eixos1[0].legend(loc='upper left')
     eixos1[0].axhline(0, color='black', linewidth=1)
     eixos1[0].set_ylim(-bess_potencia_max_kw * 1.1, None)
@@ -723,7 +723,7 @@ def plot_graph_3(
 
         eixos3.set_xlabel('Horas', fontsize=12)
         eixos3.set_ylabel('Potência Média (kW)', fontsize=12)
-        eixos3.set_title('Composição Média do Atendimento da Carga (2º Dia)', fontsize=16)
+        eixos3.set_title('Composição Média do Atendimento da Carga', fontsize=16)
         eixos3.set_xticks(horas_dia)
         eixos3.set_ylim(0, max(carga_horaria) * 1.2 if max(carga_horaria) > 0 else 100)
         eixos3.legend(loc='upper left')
@@ -785,7 +785,7 @@ def plot_graph_4(
 
         ax.set_xlabel('Capacidade BESS (kWh)')
         ax.set_ylabel('Consumo Anual de Diesel (L)')
-        ax.set_title('Consumo de Diesel vs. Dimensionamento BESS (para vários tamanhos de FV)')
+        ax.set_title('Consumo de Diesel vs. Dimensionamento BESS (variando geração fotovoltaica)')
         ax.legend()
         ax.grid(True, linestyle='--', alpha=0.7)
         plt.tight_layout()
