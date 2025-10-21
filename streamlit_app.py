@@ -30,7 +30,7 @@ SOC_RAMPA_INICIO = 85 # SOC (%) em que a potência de carga começa a ser reduzi
 
 # Aplicações (Constantes)
 ATIVAR_SUAVIZACAO_FV = True
-JANELA_SUAVIZACAO_MINUTOS = 30 # Define a "suavidade" da rampa.
+JANELA_SUAVIZACAO_MINUTOS = 5 # Define a "suavidade" da rampa.
 
 # Diesel (Constantes)
 CAPACIDADE_TOTAL_DIESEL_L = 12000
