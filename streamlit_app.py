@@ -142,7 +142,7 @@ def run_short_term_simulation(
         geracao_fv_meta = vetor_geracao_fv_suavizada[i]
         hora_do_dia = vetor_tempo[i] % 24
 
-        bess_potencia_disponivel_carga = bess_potencia_max_kw * 0.5 # Do seu script
+        bess_potencia_disponivel_carga = bess_potencia_max_kw * 0.8 # Do seu script
         bess_potencia_disponivel_descarga = bess_potencia_max_kw
         potencia_bess_suavizacao = 0
 
@@ -259,7 +259,7 @@ def run_short_term_simulation(
     return (
         vetor_tempo, vetor_carga, vetor_geracao_fv_original, vetor_geracao_fv_suavizada,
         vetor_gmg_potencia_despachada, vetor_potencia_bess, vetor_soc_kwh, vetor_gmgs_despachados,
-        potencia_pico_fv_curto, numero_de_passos, vetor_fv_para_carga  # <-- CORREÇÃO AQUI
+        potencia_pico_fv_curto, numero_de_passos, vetor_fv_para_carga
     )
 
 def _simular_autonomia_interna(
@@ -279,6 +279,8 @@ def _simular_autonomia_interna(
     pontos_horarios_longa = np.arange(len(carga_horaria_longa))
     vetor_carga_longo = np.interp(vetor_tempo_h, pontos_horarios_longa, carga_horaria_longa)
 
+    # *** AQUI É ONDE A POTÊNCIA É CALCULADA ***
+    # Usa o fator_irradiacao_fv (que agora vem do slider e seus múltiplos)
     potencia_pico_fv = potencia_pico_base_fv * EFICIENCIA_FV * fator_irradiacao_fv
 
     perfil_fv_24h_longo = np.zeros(24 * INTERVALOS_POR_HORA)
@@ -393,6 +395,7 @@ def _simular_autonomia_interna(
 @st.cache_data
 def run_long_term_simulation(
     potencia_pico_base_fv,
+    p_ceu_aberto_slider, # <-- ALTERAÇÃO 1: Recebe o valor do slider
     bess_capacidade_kwh,
     bess_potencia_max_kw,
     numero_total_gmgs,
@@ -403,10 +406,11 @@ def run_long_term_simulation(
     """
     Executa a simulação de longo prazo (Gráfico 2) para vários cenários.
     """
+    # --- ALTERAÇÃO 2: Cenários agora são baseados no slider "p_ceu_aberto_slider" ---
     cenarios_autonomia = {
-        'Dias Normais (Fator 1.0)': 1.0,
-        'Dias Nublados (Fator 0.5)': 0.5,
-        'Dia com Tempestade (Fator 0.2)': 0.2,
+        f'Dias Normais (Fator {p_ceu_aberto_slider:.2f})': p_ceu_aberto_slider,
+        f'Dias Nublados (Fator {p_ceu_aberto_slider * 0.5:.2f})': p_ceu_aberto_slider * 0.5,
+        f'Dia com Tempestade (Fator {p_ceu_aberto_slider * 0.2:.2f})': p_ceu_aberto_slider * 0.2,
         'Apenas GMG (Fator 0.0)': 0.0
     }
     resultados_autonomia = {}
@@ -416,6 +420,7 @@ def run_long_term_simulation(
     soc_inicial_longo_kwh = bess_capacidade_kwh * 0.90 # Inicia com SOC alto
 
     for nome, fator in cenarios_autonomia.items():
+        # 'fator' agora é o valor escalonado (ex: 0.8, 0.4, 0.16)
         vetor_tempo_dias_longo, vetor_nivel_diesel, dia_fim_autonomia = \
             _simular_autonomia_interna(
                 DIAS_SIMULACAO_LONGA, fator, soc_inicial_longo_kwh,
@@ -641,7 +646,7 @@ with st.spinner("Executando simulação de curto prazo..."):
     (
         vetor_tempo, vetor_carga, vetor_geracao_fv_original, vetor_geracao_fv_suavizada,
         vetor_gmg_potencia_despachada, vetor_potencia_bess, vetor_soc_kwh, vetor_gmgs_despachados,
-        potencia_pico_fv_curto, numero_de_passos, vetor_fv_para_carga # <-- CORREÇÃO AQUI
+        potencia_pico_fv_curto, numero_de_passos, vetor_fv_para_carga
     ) = run_short_term_simulation(
         p_dias_simulacao,
         p_potencia_pico_base_fv,
@@ -657,8 +662,10 @@ with st.spinner("Executando simulação de curto prazo..."):
 
 # --- Executa Simulação de Longo Prazo ---
 with st.spinner("Executando simulação de autonomia de longo prazo..."):
+    # --- ALTERAÇÃO 3: Passa o valor do slider 'p_ceu_aberto' para a função ---
     resultados_autonomia = run_long_term_simulation(
         p_potencia_pico_base_fv,
+        p_ceu_aberto, # <-- Passa o valor do slider aqui
         p_bess_capacidade_kwh,
         p_bess_potencia_max_kw,
         p_numero_total_gmgs,
@@ -684,7 +691,7 @@ st.pyplot(fig2)
 
 st.header("Gráfico 3: Composição Média do Atendimento (2º Dia)")
 fig3 = plot_graph_3(
-    vetor_carga, vetor_fv_para_carga, vetor_gmg_potencia_despachada, # Agora 'vetor_fv_para_carga' está definido
+    vetor_carga, vetor_fv_para_carga, vetor_gmg_potencia_despachada, 
     vetor_potencia_bess, numero_de_passos
 )
 if fig3:
