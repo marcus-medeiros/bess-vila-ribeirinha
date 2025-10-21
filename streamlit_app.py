@@ -64,6 +64,7 @@ def calcular_consumo_diesel(potencia_saida_kw):
     return potencia_saida_kw * SFC
 
 # --- NOVA FUNÇÃO CENTRAL DE SIMULAÇÃO ---
+# --- NOVA FUNÇÃO CENTRAL DE SIMULAÇÃO ---
 @st.cache_data(show_spinner=False)
 def _run_simulation_detailed(
     dias_simulacao,
@@ -210,15 +211,15 @@ def _run_simulation_detailed(
         bess_pode_ajudar = (soc_percentual_atual > SOC_LIMITE_MIN_NORMAL) or \
                            (potencia_carga_atual > carga_limite_emergencia and soc_percentual_atual > SOC_LIMITE_MIN_EMERGENCIA)
         
+        
         # =================================================================
-        # --- A CORREÇÃO ESTÁ AQUI ---
+        # --- CORREÇÃO 1 APLICADA AQUI ---
         # =================================================================
         # Se não houver planta FV (potência de pico EFETIVA é zero), o BESS não deve operar
         if potencia_pico_fv_curto <= 1e-6: # Usamos 1e-6 para evitar problemas com float
             bess_pode_ajudar = False
         # =================================================================
-        # --- FIM DA CORREÇÃO ---
-        # =================================================================
+        
 
         # Ajuda do BESS ponderada!
         if hora_do_dia < 6 or hora_do_dia >= 17 or geracao_fv_bruta <= 0:
@@ -240,6 +241,7 @@ def _run_simulation_detailed(
             vetor_gmgs_despachados[i] = min(numero_total_gmgs, gmgs_necessarios)
             gmg_despacho_para_carga = min(gmg_meta_para_carga, vetor_gmgs_despachados[i] * potencia_unitaria_a_usar)
             carga_restante = potencia_carga_atual - gmg_despacho_para_carga
+            
             if bess_pode_ajudar:
                 bess_despacho_para_carga = min(carga_restante, bess_potencia_disponivel_descarga)
         else:
@@ -267,9 +269,6 @@ def _run_simulation_detailed(
                 else:
                     bess_potencia_suavizacao = 0
 
-                # >>> BLOCO NOVO AQUI <<<
-                # (Nota: Este bloco parecia ter uma variável 'potencia_total_bess' indefinida no original, 
-                # foi corrigido para 'potencia_bess_suavizacao' que parecia ser a intenção)
                 if abs(bess_potencia_suavizacao) > 1e-3:
                     energia_suavizacao = abs(bess_potencia_suavizacao) * passo_de_tempo_h
                     if bess_potencia_suavizacao > 0:
@@ -280,18 +279,23 @@ def _run_simulation_detailed(
                         energia_removida = energia_suavizacao / EFICIENCIA_DESCARREGAMENTO
                         bess_soc_kwh = max(bess_soc_kwh - energia_removida,
                                            bess_capacidade_kwh * SOC_LIMITE_MIN_EMERGENCIA / 100)
-                    
-                    # A linha 'potencia_total_bess += bess_potencia_suavizacao' foi removida
-                    # pois 'potencia_total_bess' não estava definida neste escopo.
-                    # A lógica principal usa 'potencia_bess_suavizacao' mais tarde.
 
 
             #Calcula o número de GMG
             gmgs_necessarios = np.ceil(gmg_meta_para_carga / gmg_potencia_max_por_unidade) if gmg_potencia_max_por_unidade > 0 else float('inf')
             vetor_gmgs_despachados[i] = min(numero_total_gmgs, gmgs_necessarios)
             gmg_despacho_para_carga = min(gmg_meta_para_carga, vetor_gmgs_despachados[i] * gmg_potencia_max_por_unidade)
+            
             deficit_final = potencia_carga_atual - fv_despacho_para_carga - gmg_despacho_para_carga
-            bess_despacho_para_carga = max(bess_despacho_para_carga, deficit_final)
+            
+            # =================================================================
+            # --- CORREÇÃO 2 APLICADA AQUI ---
+            # =================================================================
+            # O BESS só pode cobrir o déficit se ele "puder ajudar"
+            if bess_pode_ajudar:
+                bess_despacho_para_carga = max(bess_despacho_para_carga, deficit_final)
+            # =================================================================
+
 
         potencia_total_bess = potencia_bess_suavizacao
         if bess_carga_pelo_fv > 0 and hora_do_dia < 17:
@@ -313,7 +317,7 @@ def _run_simulation_detailed(
             if energia_final_drenada > 0:
                 bess_soc_kwh -= energia_final_drenada
                 
-                # --- CORREÇÃO APLICADA AQUI (do erro anterior) ---
+                # --- CORREÇÃO DO TYPO ANTERIOR ---
                 potencia_entregue_rede = (energia_final_drenada * EFICIENCIA_DESCARREGAMENTO) / passo_de_tempo_h
                 
                 potencia_descarga_bess_carga = -potencia_entregue_rede
